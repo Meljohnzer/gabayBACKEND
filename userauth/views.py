@@ -50,10 +50,10 @@ class SendEmailVerification(APIView):
                 user = User.objects.filter(email = email)
 
                 if not user.exists():
-                    return Response("Email Is Not Registered!")
+                    return Response({"Warning":"Email Is Not Registered!","status": status.HTTP_401_UNAUTHORIZED})
                 else:
                     send_otp(email)
-                    return Response("OTP Sent Successfully!", status=status.HTTP_200_OK)
+                    return Response({"Warning":"OTP Sent Successfully!", "status":status.HTTP_200_OK})
             else:
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
@@ -73,15 +73,15 @@ class OTPVerification(APIView):
                 user = User.objects.filter(email = email)
 
                 if not user.exists():
-                    return Response("Email Is Not Registered!")
+                    return Response({"Warning":"Email Is Not Registered!","status": status.HTTP_401_UNAUTHORIZED})
                 if user[0].otp != otp:
                     return Response("Invalid OTP!",status=status.HTTP_400_BAD_REQUEST)
                 if user[0].is_Verified:
-                    return Response("Email Already Verified", status=status.HTTP_208_ALREADY_REPORTED)
+                    return Response({"Warning":"Email Already Verified!","status": status.HTTP_208_ALREADY_REPORTED})
                 user = user.first()
                 user.is_Verified = True
                 user.save()
-                return Response("Email Verified", status=status.HTTP_200_OK)
+                return Response({"Warning":"Email Verified", "status":status.HTTP_200_OK})
             else:
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
        
@@ -101,9 +101,9 @@ class Login(APIView):
             user = User.objects.filter(email=email)
             
             if not user.exists() or not check_password(password,user[0].password):
-                return Response("Incorrect Email or Password",status=status.HTTP_404_NOT_FOUND)
+                return Response({"Warning":"Incorrect Email or Password","status":status.HTTP_404_NOT_FOUND})
             if not user[0].is_Verified:
-                return Response({"status" : status.HTTP_401_UNAUTHORIZED,"Warning" : "Account Not Verified"},status=status.HTTP_401_UNAUTHORIZED)
+                return Response({"status" : status.HTTP_401_UNAUTHORIZED,"Warning" : "Account Not Verified"})
             user_data = {
                         "id": user[0].id,
                         "email": user[0].email,
