@@ -4,12 +4,9 @@ from django.contrib.auth.hashers import make_password, check_password
 from .models import * 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Count
-from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
 from rest_framework import generics,status
-from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from .email import send_otp
