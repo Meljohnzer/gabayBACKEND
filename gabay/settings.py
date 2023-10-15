@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-o=1btec2=chyxu2x0ltz=dddjvb8t6b-2ku1^e9qnlsjn6+9%*
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost','127.0.0.1']
+ALLOWED_HOSTS = []
 
 AUTH_USER_MODEL = 'userauth.User'
 
@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'userauth',
+    'corsheaders',
     'income'
 ]
 
@@ -52,7 +53,10 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware'
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'gabay.urls'
 
@@ -85,6 +89,11 @@ DATABASES = {
     }
 }
 
+#  'NAME': 'gabaydb',
+#         'HOST' : 'localhost',
+#         'PORT': '3306',
+#         'USER': 'root',
+#         'PASSWORD' : '',
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

@@ -4,6 +4,7 @@ from django.contrib.auth.hashers import make_password, check_password
 from .models import * 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponse
 from rest_framework import generics,status
@@ -52,7 +53,9 @@ class SendEmailVerification(APIView):
                 html = "email.html"
                 subject = "Account One Time Pin Verification!"
                 if not user.exists():
-                    return Response({"Warning":"Email Is Not Registered!","status": status.HTTP_401_UNAUTHORIZED})
+                    return Response({"Warning":"Email Is Not Registered!", "status" : status.HTTP_404_NOT_FOUND})
+                if user[0].is_Verified:
+                    return Response({"Warning":"Email Already Verified", "status" : status.HTTP_208_ALREADY_REPORTED})
                 else:
                     send_otp(email,html,subject)
                     return Response({"Warning":"OTP Sent Successfully!", "status":status.HTTP_200_OK})
@@ -75,11 +78,11 @@ class OTPVerification(APIView):
                 user = User.objects.filter(email = email)
 
                 if not user.exists():
-                    return Response({"Warning":"Email Is Not Registered!","status": status.HTTP_401_UNAUTHORIZED})
+                    return Response({"Warning":{"Warning":"Email Is Not Registered!","status": status.HTTP_401_UNAUTHORIZED}, "status" : status.HTTP_404_NOT_FOUND})
                 if user[0].otp != otp:
-                    return Response("Invalid OTP!",status=status.HTTP_400_BAD_REQUEST)
+                    return Response({"Warning":"Invalid OTP!","status":status.HTTP_400_BAD_REQUEST})
                 if user[0].is_Verified:
-                    return Response({"Warning":"Email Already Verified!","status": status.HTTP_208_ALREADY_REPORTED})
+                    return Response({"Warning":"Email Already Verified", "status":status.HTTP_208_ALREADY_REPORTED})
                 user = user.first()
                 user.is_Verified = True
                 user.save()
@@ -100,8 +103,12 @@ class Login(APIView):
         if serializer.is_valid():
             email = serializer.validated_data['email']
             password = serializer.validated_data['password']
-            user = User.objects.filter(email=email).first()
-            income = Income.objects.filter(user = user.id)
+            user = User.objects.filter(email=email)
+            
+            if not user.exists() or not check_password(password,user[0].password):
+                return Response({"Warning":"Incorrect Email or Password","status":status.HTTP_404_NOT_FOUND})
+            if not user[0].is_Verified:
+                return Response({"Warning" : "Account Not Verified","status" : status.HTTP_401_UNAUTHORIZED})
             user_data = {
                         "id": user.id,
                         "email": user.email,
