@@ -11,7 +11,9 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from .email import send_otp
 from rest_framework.views import APIView
-from .serializers import (RegisterSerializer,SendEmailVerificationSerializer,OTPVerificationSerializer,LoginSerializer)
+from .serializers import (RegisterSerializer,SendEmailVerificationSerializer,
+                          OTPVerificationSerializer,LoginSerializer,
+                          ForgotPasswordSerializer)
 from rest_framework.generics import GenericAPIView,RetrieveUpdateAPIView
 from rest_framework.permissions import IsAuthenticated
 
@@ -21,10 +23,15 @@ class RegisterView(APIView):
         data=request.data
         serializer = RegisterSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        # send_otp(serializer.data['email'])
-        # queryset = User.objects.all()
-        return Response(
+        email = serializer.data['email']
+        user = User.objects.filter(email = email)
+        
+        if user.exists():
+            return Response({"Warning" : "Email Is Already Used!","status": status.HTTP_226_IM_USED})
+
+        else:
+            serializer.save()
+            return Response(
           'Registered successfully!'
         )
 #To Acces All Current User
@@ -45,11 +52,12 @@ class SendEmailVerification(APIView):
             if serializer.is_valid():
                 email = serializer.data['email']
                 user = User.objects.filter(email = email)
-
+                html = "email.html"
+                subject = "Account One Time Pin Verification!"
                 if not user.exists():
                     return Response({"Warning":"Email Is Not Registered!","status": status.HTTP_401_UNAUTHORIZED})
                 else:
-                    send_otp(email)
+                    send_otp(email,html,subject)
                     return Response({"Warning":"OTP Sent Successfully!", "status":status.HTTP_200_OK})
             else:
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -112,3 +120,28 @@ class Login(APIView):
     except Exception as e:
             print(e)
             return Response("Internal Server Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+
+class SendEmailForgotVerification(APIView):
+    def post(self,request):
+        try:
+            data = request.data
+            serializer = SendEmailVerificationSerializer(data=data)
+            if serializer.is_valid():
+                email = serializer.data['email']
+                user = User.objects.filter(email = email)
+                html = "passwmail.html"
+                subject = "Forgotten Password Account One Time Pin Verification!"
+                if not user.exists():
+                    return Response({"Warning":"Email Is Not Registered!","status": status.HTTP_401_UNAUTHORIZED})
+                else:
+                    send_otp(email,html,subject)
+                    return Response({"Warning":"OTP Sent Successfully!", "status":status.HTTP_200_OK})
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        except Exception as e:
+            print(e)
+            return Response("Internal Server Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+

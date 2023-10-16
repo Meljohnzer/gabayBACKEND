@@ -6,10 +6,10 @@ from django.conf import settings
 from .models import User
 
 
-def send_otp(email):
-    subject = "Account One Time Pin Verification!"
+def send_otp(email,html,subject):
+    # subject = "Account One Time Pin Verification!"
     otp = random.randint(100000,999999)
-    message = render_to_string('email.html', {'otp':otp})
+    message = render_to_string([html], {'otp':otp})
     email_from = settings.EMAIL_HOST
     # send_mail(subject, message,email_from, [email])
     email_message = EmailMessage(subject, message, email_from, [email])
