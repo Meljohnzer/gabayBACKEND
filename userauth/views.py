@@ -103,12 +103,8 @@ class Login(APIView):
         if serializer.is_valid():
             email = serializer.validated_data['email']
             password = serializer.validated_data['password']
-            user = User.objects.filter(email=email)
-            
-            if not user.exists() or not check_password(password,user[0].password):
-                return Response({"Warning":"Incorrect Email or Password","status":status.HTTP_404_NOT_FOUND})
-            if not user[0].is_Verified:
-                return Response({"Warning" : "Account Not Verified","status" : status.HTTP_401_UNAUTHORIZED})
+            user = User.objects.filter(email=email).first()
+            income = Income.objects.filter(user = user.id)
             user_data = {
                         "id": user.id,
                         "email": user.email,
@@ -123,7 +119,7 @@ class Login(APIView):
             
             return JsonResponse({"user" : user_data ,"status": status.HTTP_200_OK,"bol":income.exists()})
         else:
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
             print(e)
             return JsonResponse({"Warning":"Incorrect Email or Password", "status" : status.HTTP_500_INTERNAL_SERVER_ERROR})
