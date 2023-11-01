@@ -50,9 +50,10 @@ class YourModelListView(generics.ListAPIView):
         # Extract month and year from query parameters
         # month = self.request.query_params.get('month')
         date = self.request.query_params.get('date')
+        user = self.kwargs.get('user')
         
         # Get objects for the specified month and year, order by date
-        queryset = Transaction.objects.filter(date=date).order_by('date')
+        queryset = Transaction.objects.filter(date=date,user = user).order_by('date')
         
         # Create a paginator object
         paginator = Paginator(queryset, self.items_per_page)
