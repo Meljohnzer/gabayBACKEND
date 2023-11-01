@@ -16,6 +16,7 @@ from .serializers import (RegisterSerializer,SendEmailVerificationSerializer,
                           ForgotPasswordSerializer)
 from rest_framework.generics import GenericAPIView,RetrieveUpdateAPIView
 from rest_framework.permissions import IsAuthenticated
+from income.models import *
 
 #Creating new account
 class RegisterView(APIView):
@@ -23,15 +24,11 @@ class RegisterView(APIView):
         data=request.data
         serializer = RegisterSerializer(data=data)
         serializer.is_valid(raise_exception=True)
-        email = serializer.data['email']
-        user = User.objects.filter(email = email)
-        
-        if user.exists():
-            return Response({"Warning" : "Email Is Already Used!","status": status.HTTP_226_IM_USED})
-
-        else:
-            serializer.save()
-            return Response(
+        email = serializer.validated_data['email']
+        user = User.objects.filter(email = email).first()
+     
+        serializer.save()
+        return Response(
           'Registered successfully!'
         )
 #To Acces All Current User
@@ -103,23 +100,26 @@ class Login(APIView):
         if serializer.is_valid():
             email = serializer.validated_data['email']
             password = serializer.validated_data['password']
-            user = User.objects.filter(email=email)
-            
-            if not user.exists() or not check_password(password,user[0].password):
-                return Response({"Warning":"Incorrect Email or Password","status":status.HTTP_404_NOT_FOUND})
-            if not user[0].is_Verified:
-                return Response({"status" : status.HTTP_401_UNAUTHORIZED,"Warning" : "Account Not Verified"})
+            user = User.objects.filter(email=email).first()
+            income = Income.objects.filter(user = user.id)
             user_data = {
-                        "id": user[0].id,
-                        "email": user[0].email,
+                        "id": user.id,
+                        "email": user.email,
                         # Add other fields you want to include in the response
                     }
-            return JsonResponse({"user" : user_data ,"status": status.HTTP_200_OK})
+            if not user or not check_password(password,user.password):
+                return Response({"Warning":"Incorrect Email or Password","status":status.HTTP_404_NOT_FOUND})
+            if not user.is_Verified:
+                return Response({"status" : status.HTTP_401_UNAUTHORIZED,"Warning" : "Account Not Verified"})
+            if income.exists():
+                 return JsonResponse({"status" : status.HTTP_100_CONTINUE,"Warning" : "Home","user" : user_data,"bol":income.exists()})
+            
+            return JsonResponse({"user" : user_data ,"status": status.HTTP_200_OK,"bol":income.exists()})
         else:
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
             print(e)
-            return Response("Internal Server Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return JsonResponse({"Warning":"Incorrect Email or Password", "status" : status.HTTP_500_INTERNAL_SERVER_ERROR})
     
 
 class SendEmailForgotVerification(APIView):
@@ -145,3 +145,21 @@ class SendEmailForgotVerification(APIView):
             return Response("Internal Server Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class NewPassword(generics.RetrieveUpdateAPIView):
+    serializer_class = ForgotPasswordSerializer
+    queryset = User.objects.all()
+    lookup_field = "email"
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Hash the new password before saving it
+        validated_data = serializer.validated_data
+        new_password = validated_data.get('password')
+        hashed_password = make_password(new_password)
+        instance.password = hashed_password
+        instance.save()
+
+        return Response(serializer.data)

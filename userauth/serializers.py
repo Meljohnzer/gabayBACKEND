@@ -30,6 +30,6 @@ class ForgotPasswordSerializer(serializers.ModelSerializer):
 
      class Meta:
          model= User
-         fields = ['password','email']
+         fields = ['password']
 
 

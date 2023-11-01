@@ -127,6 +127,14 @@ EMAIL_HOST_USER = '250f1e786b88ff'
 EMAIL_HOST_PASSWORD = 'cb1098b88b53ee'
 EMAIL_PORT = '2525'
 
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.gmail.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'team.besagunsa@gmail.com' # Replace with your email
+# EMAIL_HOST_PASSWORD = 'ewpctbaoeyahlrek' # Replace with your email password
+# DEFAULT_FROM_EMAIL = 'team.besagunsa@gmail.com' # Replace with your email
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 

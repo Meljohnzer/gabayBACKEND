@@ -8,5 +8,7 @@ urlpatterns = [
     path('verify/',OTPVerification.as_view()),
     path('login/',Login.as_view()),
     path('otp/reset/password/',SendEmailForgotVerification.as_view()),
+    path('new/password/<str:email>/',NewPassword.as_view()),
+
     
     ]
