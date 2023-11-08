@@ -89,5 +89,6 @@ class SumIncome(generics.ListAPIView):
 
         queryset = Income.objects.filter(user=user)
         total_amount = queryset.aggregate(total_amount=Sum('amount'))['total_amount']
+        serializer = self.get_serializer(queryset, many=True)
         
-        return Response({'total_amount': total_amount})
+        return Response({'total_amount': total_amount,'data':serializer.data})

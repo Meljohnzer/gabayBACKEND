@@ -40,6 +40,10 @@ class RegisterViewAll(generics.ListAPIView):
         queryset = User.objects.all()
         return queryset
     
+class DelUserView(generics.RetrieveDestroyAPIView):
+    serializer_class = RegisterSerializer
+    queryset = User.objects.all()
+    lookup_field = "pk"
 #Accept Email to Send OTP
 class SendEmailVerification(APIView):
 
