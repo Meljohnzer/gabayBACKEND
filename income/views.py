@@ -41,6 +41,25 @@ class AddTransaction(generics.ListCreateAPIView):
         # Group the data by the 'date' field and annotate it with the count of transactions
         queryset = Transaction.objects.annotate(transaction_count=Count('id'))
         return queryset
+
+    def perform_create(self, serializer):
+        user = serializer.validated_data['user']
+        category = serializer.validated_data['category']
+        date = serializer.validated_data['date']
+        amount = serializer.validated_data['amount']
+        description = serializer.validated_data['description']
+
+        # Check if a transaction with the same user, category, date, and description exists
+        existing_transaction = Transaction.objects.filter(user=user, category=category, date=date, description=description).first()
+
+        if existing_transaction:
+            # If the transaction with the same description exists, update the amount
+            existing_transaction.amount += amount
+            existing_transaction.save()
+            return existing_transaction
+        else:
+            # If no existing transaction with the same description found, create a new one
+            serializer.save()
     
 class YourModelListView(generics.ListAPIView):
     serializer_class = NewTransactionSerializer
