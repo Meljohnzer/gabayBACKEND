@@ -47,9 +47,15 @@ class SumIncomeSerializer(serializers.ModelSerializer):
     value = serializers.IntegerField(source='amount')
     class Meta:
         model = Income
-        fields = ['total_sum','key','value','icon']
+        fields = ['id','total_sum','key','value','icon']
 
     def get_total_sum(self, obj):
         queryset = Income.objects.filter(user=obj.user)
         total_amount = queryset.aggregate(total_amount=Sum('amount'))['total_amount']
         return total_amount
+    
+
+class TransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Transaction
+        fields = ['user','date', 'category', 'icon','description','amount']

@@ -17,7 +17,7 @@ class Transaction(models.Model):
     user = models.ForeignKey(User,on_delete=models.CASCADE)
     category = models.ForeignKey(Category,on_delete=models.CASCADE)
     amount = models.IntegerField()
-    icon = models.CharField(max_length=125,null=True)
+    icon = models.IntegerField()
     description = models.TextField()
     date = models.DateField()
     color = models.CharField(max_length=124,null=True)
