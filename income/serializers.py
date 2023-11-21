@@ -18,7 +18,10 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = '__all__'
-
+class EditTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Transaction
+        fields = ['description','amount']
 class NewTransactionSerializer(serializers.ModelSerializer):
     key = serializers.CharField(source='description')
     value = serializers.IntegerField(source='amount')

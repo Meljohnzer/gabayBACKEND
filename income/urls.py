@@ -6,6 +6,7 @@ urlpatterns = [
     path('income/view/<int:user>/',ShowIncome.as_view()),
     path('category/',AddCategory.as_view()),
     path('transaction/',AddTransaction.as_view()),
+    path('transaction/edit/<int:pk>/',EditTransaction.as_view()),
     path('page/<int:user>/',YourModelListView.as_view()),
     path('same/month/year/<int:user>/',GetAllTheSameMonth.as_view()),
     path('user/income/',SumIncome.as_view()),

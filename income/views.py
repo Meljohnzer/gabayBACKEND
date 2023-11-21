@@ -3,6 +3,7 @@ from django.db.models import Sum
 from rest_framework import generics,status
 from .serializers import (IncomeSerializer,
                           CategorySerializer,
+                          EditTransactionSerializer,
                           TransactionSerializer,
                           YourGroupedDataSerializer,
                           DateSerializer,
@@ -65,6 +66,11 @@ class AddTransaction(generics.ListCreateAPIView):
         else:
             # If no existing transaction with the same description found, create a new one
             serializer.save()
+
+class EditTransaction(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = EditTransactionSerializer
+    queryset = Transaction.objects.all()
+    lookup_field = "pk"
     
 class YourModelListView(generics.ListAPIView):
     serializer_class = NewTransactionSerializer
