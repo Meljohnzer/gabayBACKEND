@@ -189,7 +189,7 @@ class TransactionDataView(generics.ListAPIView):
             ts = pivot_table[category]
 
     # Calculate weighted moving average with weights [0.5, 0.3, 0.2]
-            weights = np.array([0.5, 0.5, 0.0])
+            weights = np.array([0.6, 0.2, 0.2])
             weighted_avg = np.convolve(ts.sum(axis=1), weights[::-1], mode='valid')
 
     # Forecast for the next 3 periods (next 3 months)
@@ -201,7 +201,7 @@ class TransactionDataView(generics.ListAPIView):
             print(f"Predicted sum for '{category}' for each predicted month:")
             print(predicted_sum.mean())
             mean_predicted_sum = predicted_sum.mean()
-            category_labels = {1: 'necessities', 2: 'wants', 3: 'savings'}
+            category_labels = {1: 'Necessities', 2: 'Wants', 3: 'Savings'}
             results_list.append({
                 'key': category_labels.get(category, f'Category_{category}'),
                 'value': mean_predicted_sum.tolist()  # Convert to list to handle numpy types in JSON
