@@ -144,11 +144,10 @@ class TransactionDataView(generics.ListAPIView):
             no_months_to_predict *= 12
 
         # Serialize the queryset
-        print(no_months_to_predict)
+        # print(no_months_to_predict)
         serializer = self.get_serializer(queryset, many=True)
 
         df = pd.DataFrame(serializer.data)
-        print(df)
         df['date'] = pd.to_datetime(df['date'])
         # Handle missing values (you can choose to use different methods)
         # For example, forward-fill to replace missing values
@@ -161,25 +160,26 @@ class TransactionDataView(generics.ListAPIView):
         ts_data = df.groupby([pd.Grouper(freq='M'), 'category', 'description'])['amount'].sum().reset_index()
 
         # Pivot the table to have 'category' as columns
+        
         pivot_table = ts_data.pivot(index='date', columns=['category', 'description'], values='amount')
-
+        
         predicted_sums_per_category = {}
 
         sum_of_all_categories = income - pivot_table.sum(axis=1)
 
 # Reindex sum_of_all_categories to match the index of pivot_table
         sum_of_all_categories = sum_of_all_categories.reindex(pivot_table.index)
-        sum_of_all_categories_array = sum_of_all_categories.to_numpy()
-        nan_values_mask = pd.isna(pivot_table[3]).to_numpy()
+        # sum_of_all_categories_array = sum_of_all_categories.to_numpy()
+        # nan_values_mask = pd.isna(pivot_table[3]).to_numpy()
 
 # Fill NaN values in pivot_table with the corresponding values from sum_of_all_categories
-        pivot_table.loc[:, (3, slice(None))] = pivot_table.loc[:, (3, slice(None))].fillna(0, axis=0)
+        print(df)
+        if (3, '') not in pivot_table.columns:
+            pivot_table[(3, '')] = 0
+            pivot_table.loc[:, (3, '')] = pivot_table.loc[:, (3, '')].fillna(0, axis=0)
+            pivot_table[(3, 'Unique')] = sum_of_all_categories
 
-        zero_cells = pivot_table.loc[:, (3, slice(None))] == 0
 
-        # pivot_table.loc[:, (3, slice(None))] = pivot_table.loc[:, (3, slice(None))].mask(zero_cells, sum_of_all_categories, axis=0)
-        
-        pivot_table[(3, 'Unique')] = sum_of_all_categories
         print(pivot_table)
         results_list = []
         for category in pivot_table.columns.levels[0]:
