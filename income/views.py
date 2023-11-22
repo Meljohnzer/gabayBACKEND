@@ -3,6 +3,7 @@ from django.db.models import Sum
 from rest_framework import generics,status
 from .serializers import (IncomeSerializer,
                           CategorySerializer,
+                          EditIncomeSerializer,
                           EditTransactionSerializer,
                           TransactionSerializer,
                           YourGroupedDataSerializer,
@@ -23,7 +24,31 @@ import numpy as np
 # Create your views here.
 class AddIncome(generics.ListCreateAPIView):
     serializer_class  = IncomeSerializer
+    # queryset = Income.objects.all()
+    def get_queryset(self):
+        # Group the data by the 'date' field and annotate it with the count of transactions
+        queryset = Income.objects.annotate(transaction_count=Count('id'))
+        return queryset
+    def perform_create(self, serializer):
+        user = serializer.validated_data['user']
+        title = serializer.validated_data['title']
+        amount = serializer.validated_data['amount']
+
+        # Check if a transaction with the same user, category, date, and description exists
+        existing_transaction = Income.objects.filter(user=user, title=title).first()
+
+        if existing_transaction:
+            # If the transaction with the same description exists, update the amount
+            existing_transaction.amount += amount
+            existing_transaction.save()
+            return existing_transaction
+        else:
+            # If no existing transaction with the same description found, create a new one
+            serializer.save()
+class EditIncome(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = EditIncomeSerializer
     queryset = Income.objects.all()
+    lookup_field = "pk"
 
 #Todo Add Request Api to call
 class ShowIncome(generics.RetrieveAPIView):

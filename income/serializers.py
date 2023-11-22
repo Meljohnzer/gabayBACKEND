@@ -8,6 +8,10 @@ class IncomeSerializer(serializers.ModelSerializer):
         model = Income
         fields = '__all__'
 
+class EditIncomeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Income
+        fields = ['title','amount']
 class CategorySerializer(serializers.ModelSerializer):
 
     class Meta:

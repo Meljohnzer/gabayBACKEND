@@ -3,6 +3,7 @@ from .views import *
 
 urlpatterns = [
     path('add/',AddIncome.as_view()),
+    path('add/edit/<int:pk>/',EditIncome.as_view()),
     path('income/view/<int:user>/',ShowIncome.as_view()),
     path('category/',AddCategory.as_view()),
     path('transaction/',AddTransaction.as_view()),
