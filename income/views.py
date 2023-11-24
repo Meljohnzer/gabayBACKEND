@@ -99,7 +99,7 @@ class EditTransaction(generics.RetrieveUpdateDestroyAPIView):
     
 class YourModelListView(generics.ListAPIView):
     serializer_class = NewTransactionSerializer
-    items_per_page = 10
+    items_per_page = 20
 
     def get_queryset(self):
         # Extract month and year from query parameters
@@ -207,6 +207,10 @@ class TransactionDataView(generics.ListAPIView):
 
         print(pivot_table)
         results_list = []
+
+        # num_categories = len(pivot_table.columns.levels[0])
+        # weights = np.linspace(0.1, 1.0, num_categories)
+        # weights /= weights.sum() 
         for category in pivot_table.columns.levels[0]:
             print(f"WEIGHTED MOVING AVERAGE FORECAST '{category}'")
 
@@ -214,13 +218,16 @@ class TransactionDataView(generics.ListAPIView):
             ts = pivot_table[category]
 
     # Calculate weighted moving average with weights [0.5, 0.3, 0.2]
-            weights = np.array([0.6, 0.2, 0.2])
+            # weights = np.array([0.6, 0.2, 0.2])
+            weights = np.linspace(0.1, 1, len(ts))  # Example: linearly increasing weights
+            weights /= weights.sum()  # Normalize weights to ensure they sum to 1
+            print(weights)
             weighted_avg = np.convolve(ts.sum(axis=1), weights[::-1], mode='valid')
 
-    # Forecast for the next 3 periods (next 3 months)
+   
             forecast = weighted_avg[-1]  # Use the last available weighted moving average value as the forecast
 
-    # Create a series with the same value for the next 3 months
+   
             predicted_sum = pd.Series([forecast] * int(no_months_to_predict), index=pd.date_range(start=ts.index[-1] + pd.offsets.MonthEnd(), periods=int(no_months_to_predict), freq='M'))
 
             print(f"Predicted sum for '{category}' for each predicted month:")
