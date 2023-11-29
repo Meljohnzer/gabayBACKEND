@@ -1,5 +1,10 @@
 from django.shortcuts import render
 from django.template.loader import render_to_string
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from django.http import HttpResponse
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle,Spacer,Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
 from django.core.mail import send_mail
 from django.db.models import Sum
 from django.conf import settings
@@ -23,6 +28,7 @@ from django.http import JsonResponse
 from rest_framework.views import APIView
 import pandas as pd
 import numpy as np
+import io
 
 
 
@@ -152,6 +158,14 @@ class SumIncome(generics.ListAPIView):
         serializer = self.get_serializer(queryset, many=True)
         
         return Response({'total_amount': total_amount,'data':serializer.data})
+def map_category(category_id):
+    # You may need to adjust this based on your actual Category model structure
+        category_mapping = {
+        1: "Necessities",
+        2: "Wants",
+        3: "Savings",
+    }
+        return category_mapping.get(category_id, "Unknown")
     
 class TransactionDataView(generics.ListAPIView):
     serializer_class = TransactionSerializer
@@ -163,12 +177,17 @@ class TransactionDataView(generics.ListAPIView):
         return Transaction.objects.all().filter(user=user)
 
     def list(self, request, *args, **kwargs):
+        user = self.kwargs.get('user', None)
+        transaction = Transaction.objects.all().filter(user=user)
+        user_income = Income.objects.all().filter(user=user)
 
         queryset = self.get_queryset()
 
         period = self.request.query_params.get('period')
+        choice = self.request.query_params.get('choice')
         no_months_to_predict = int(self.request.query_params.get('no_months_to_predict'))
         income = int(self.request.query_params.get('income'))
+
 
         if period == "Year":
             no_months_to_predict *= 12
@@ -261,10 +280,116 @@ class TransactionDataView(generics.ListAPIView):
 # Here, use the numeric value '3' instead of the variable category
         print("Total saving that will be achieved in that time:")
         print(predicted_sums_per_category[3].sum())
+
+        # pdf -0808
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="income_report.pdf"'
+
+        # Create a PDF document
+        pdf_buffer = io.BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
+
+        title = "Transaction Reports"
+        styles = getSampleStyleSheet()
+        title_style = styles['Title']
+        doc_title = Paragraph(title, title_style)
+
+        income_title = "Income Reports"
+        income_doc_title = Paragraph(income_title, title_style)
+
+        
+        average_title = "Average Reports"
+        average_doc_title = Paragraph(average_title, title_style)
+
+        # Create a table and set its style
+        table_data = [['Date', 'Category', 'Description', 'Amount']]
+        for transactions in transaction:
+            data = TransactionSerializer(transactions).data
+            date_str = data['date']
+            user_id = data['user']
+            category_id = data['category']
+            icon_id = data['icon']
+            description = data['description']
+            amount = data['amount']
+
+            category_label = map_category(category_id)
+
+            table_data.append([date_str, category_label, description, f"P {amount:.2f}"])
+            
+
+        transaction_table = Table(table_data, colWidths=100, rowHeights=25)
+        transaction_table.setStyle(TableStyle([
+            # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            # ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#3A6B35')),
+            # ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border above the header row
+            ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
+            ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),# Add a horizontal border to the data rows
+        ]))
+        
+        table_data = [['Title', 'Amount']]
+        for incomes in user_income:
+            data = IncomeSerializer(incomes).data
+            Title = data['title']
+            amount = data['amount']
+
+            table_data.append([Title,f"P {amount:.2f}"])
+
+        income_table = Table(table_data, colWidths=200, rowHeights=25)
+        income_table.setStyle(TableStyle([
+            # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            # ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border above the header row
+            ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
+            ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),  # Add a horizontal border to the data rows
+        ]))
+
+        table_data = [['Category', 'Average']]
+        for average in results_list:
+            label = average['key']
+            amount = average['value']
+
+            table_data.append([label,f"P {amount:.2f}"])
+
+        average_table = Table(table_data, colWidths=200, rowHeights=25)
+        average_table.setStyle(TableStyle([
+            # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            # ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border above the header row
+            ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
+            ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),  # Add a horizontal border to the data rows
+        ]))
+
+        # Build the PDF document
+
+
+        
+        doc.build([doc_title, transaction_table,income_doc_title,income_table,average_doc_title,average_table])
+
+        pdf_value = pdf_buffer.getvalue()
+
+        response.write(pdf_value)
+
+        # pdf
         
         # print(df)
         # Return the serialized data as JSON response
-        return Response({"avarage" : results_list,"forecast":predicted_sums_per_category[3].sum()})
+        if choice == "PDF":
+            return response
+        else:
+            return Response({"avarage" : results_list,"forecast":predicted_sums_per_category[3].sum()})
 
 class SendEmailRS(APIView):
     def post(self, request, *args, **kwargs):
@@ -288,3 +413,88 @@ class SendEmailRS(APIView):
             return Response({'message': 'Email sent successfully'}, status=status.HTTP_200_OK)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class GeneratePDFView(APIView):
+    
+    
+    def get(self, request, *args, **kwargs):
+        user = self.kwargs.get('user', None)
+        transaction = Transaction.objects.all().filter(user=user)
+        user_income = Income.objects.all().filter(user=user)
+
+        # Create a response object with PDF content type
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="income_report.pdf"'
+
+        # Create a PDF document
+        pdf_buffer = io.BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
+
+        title = "Transaction Reports"
+        styles = getSampleStyleSheet()
+        title_style = styles['Title']
+        doc_title = Paragraph(title, title_style)
+
+        income_title = "Income Reports"
+        income_doc_title = Paragraph(income_title, title_style)
+
+        # Create a table and set its style
+        table_data = [['Date', 'Category', 'Description', 'Amount']]
+        for transactions in transaction:
+            data = TransactionSerializer(transactions).data
+            date_str = data['date']
+            user_id = data['user']
+            category_id = data['category']
+            icon_id = data['icon']
+            description = data['description']
+            amount = data['amount']
+
+            category_label = map_category(category_id)
+
+            table_data.append([date_str, category_label, description, amount])
+            
+
+        transaction_table = Table(table_data, colWidths=100, rowHeights=25)
+        transaction_table.setStyle(TableStyle([
+            # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            # ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#3A6B35')),
+            # ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border above the header row
+            ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
+            ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),# Add a horizontal border to the data rows
+        ]))
+        
+        table_data = [['Title', 'Amount']]
+        for incomes in user_income:
+            data = IncomeSerializer(incomes).data
+            Title = data['title']
+            amount = data['amount']
+
+            table_data.append([Title,amount])
+
+        income_table = Table(table_data, colWidths=200, rowHeights=25)
+        income_table.setStyle(TableStyle([
+            # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            # ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border above the header row
+            ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
+            ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),  # Add a horizontal border to the data rows
+        ]))
+
+        # Build the PDF document
+        
+        doc.build([doc_title, transaction_table,income_doc_title,income_table])
+
+        pdf_value = pdf_buffer.getvalue()
+
+        response.write(pdf_value)
+
+        return response

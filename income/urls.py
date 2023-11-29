@@ -12,5 +12,6 @@ urlpatterns = [
     path('same/month/year/<int:user>/',GetAllTheSameMonth.as_view()),
     path('user/income/',SumIncome.as_view()),
     path('transaction-data/<int:user>/', TransactionDataView.as_view(), name='transaction-data'),
-    path('report/problem/',SendEmailRS.as_view())
+    path('report/problem/',SendEmailRS.as_view()),
+    path('generate-pdf/<int:user>/', GeneratePDFView.as_view(), name='generate-pdf'),
     ]

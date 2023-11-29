@@ -10,6 +10,7 @@ django-cors-headers = "*"
 mysqlclient = "*"
 pandas = "*"
 numpy = "*"
+reportlab = "*"
 
 [dev-packages]
 
