@@ -66,3 +66,9 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = ['user','date', 'category', 'icon','description','amount']
+
+
+class SendMailSerializer(serializers.Serializer):
+    from_email = serializers.EmailField()
+    subject = serializers.CharField()
+    message = serializers.CharField()

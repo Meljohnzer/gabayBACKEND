@@ -1,5 +1,8 @@
 from django.shortcuts import render
+from django.template.loader import render_to_string
+from django.core.mail import send_mail
 from django.db.models import Sum
+from django.conf import settings
 from rest_framework import generics,status
 from .serializers import (IncomeSerializer,
                           CategorySerializer,
@@ -8,6 +11,7 @@ from .serializers import (IncomeSerializer,
                           TransactionSerializer,
                           YourGroupedDataSerializer,
                           DateSerializer,
+                          SendMailSerializer,
                           NewTransactionSerializer,
                           SumIncomeSerializer,
                           TransactionSerializer)
@@ -16,6 +20,7 @@ from django.db.models import Count
 from rest_framework.response import Response
 from django.core.paginator import Paginator
 from django.http import JsonResponse
+from rest_framework.views import APIView
 import pandas as pd
 import numpy as np
 
@@ -260,3 +265,26 @@ class TransactionDataView(generics.ListAPIView):
         # print(df)
         # Return the serialized data as JSON response
         return Response({"avarage" : results_list,"forecast":predicted_sums_per_category[3].sum()})
+
+class SendEmailRS(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = SendMailSerializer(data=request.data)
+
+        if serializer.is_valid():
+            type = self.request.query_params.get('type')
+            from_email = serializer.validated_data['from_email']
+            subject = serializer.validated_data['subject']
+            message = serializer.validated_data['message']
+            to_email = settings.EMAIL_HOST_USER
+            host = settings.EMAIL_HOST
+            if type == "Report":
+                email_content = render_to_string('reportmail.html', {'subject': subject, 'message': message,'email' : from_email})
+            else:
+                email_content = render_to_string('supportmail.html', {'subject': subject, 'message': message,'email' : from_email})
+            # Assuming you have configured your email settings in settings.py
+            send_mail(subject, message, from_email, [to_email], fail_silently=False)
+            send_mail(subject, "", host, [from_email],html_message=email_content, fail_silently=False)
+        
+            return Response({'message': 'Email sent successfully'}, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
