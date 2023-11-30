@@ -29,6 +29,9 @@ from rest_framework.views import APIView
 import pandas as pd
 import numpy as np
 import io
+from itertools import groupby
+from operator import itemgetter
+from datetime import datetime
 
 
 
@@ -282,11 +285,12 @@ class TransactionDataView(generics.ListAPIView):
         print(predicted_sums_per_category[3].sum())
 
         # pdf -0808
-        response = HttpResponse(content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename="income_report.pdf"'
+        pdf_buffer = io.BytesIO()
+        response = HttpResponse(pdf_buffer.read(),content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="Gabay_report.pdf"'
 
         # Create a PDF document
-        pdf_buffer = io.BytesIO()
+        
         doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
 
         title = "Transaction Reports"
@@ -294,6 +298,8 @@ class TransactionDataView(generics.ListAPIView):
         title_style = styles['Title']
         doc_title = Paragraph(title, title_style)
 
+        months = ""
+        months_title = Paragraph(months,title_style)
         income_title = "Income Reports"
         income_doc_title = Paragraph(income_title, title_style)
 
@@ -301,7 +307,11 @@ class TransactionDataView(generics.ListAPIView):
         average_title = "Average Reports"
         average_doc_title = Paragraph(average_title, title_style)
 
+        forecast_title = "Forcast Reports"
+        forecast_doc_title = Paragraph(forecast_title, title_style)
+
         # Create a table and set its style
+        transaction_jSON = []
         table_data = [['Date', 'Category', 'Description', 'Amount']]
         for transactions in transaction:
             data = TransactionSerializer(transactions).data
@@ -314,13 +324,41 @@ class TransactionDataView(generics.ListAPIView):
 
             category_label = map_category(category_id)
 
-            table_data.append([date_str, category_label, description, f"P {amount:.2f}"])
+            transaction_jSON.append({'date':date_str, "category":category_label, "description":description, "amount":"P {:,.2f}".format(amount)})
             
+        sorted_transactions = sorted(transaction_jSON, key=itemgetter('date'))
 
-        transaction_table = Table(table_data, colWidths=100, rowHeights=25)
-        transaction_table.setStyle(TableStyle([
+        grouped_by_month = {month: list(group) for month, group in groupby(sorted_transactions, key=lambda x: x['date'])}
+
+        content  = []
+
+        for month, transactions_group in grouped_by_month.items():
+            # content.append(f"{month}\n{'_' * 30}\n\n")
+            # Create a table for each month
+            parse_data = datetime.strptime(month, "%Y-%m-%d")
+            long = parse_data.strftime("%B %Y")
+            print(months)
+            month_table_data = [["","",f"{long}","",""],['Category', "",'Description',"", 'Amount']]
+            total_amount_sum = 0
+            for transaction in transactions_group:
+                date_str = transaction['date']
+                category_label = transaction['category']
+                description = transaction['description']
+                amount = transaction['amount']
+
+                month_table_data.append([category_label,"",description,"", amount])
+
+                amount_value = float(amount.split()[1].replace(',', ''))
+                total_amount_sum += amount_value
+            month_table_data.append(["Total Amount", "", "", "","P {:,.2f}".format(total_amount_sum)])
+            month_table_data.append([''])
+
+            
+            transaction_table = Table(month_table_data, colWidths=100, rowHeights=25)
+            transaction_table.setStyle(TableStyle([
             # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.green),
+            ('TEXTCOLOR',  (0, 1), (-1, 1), colors.red),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
@@ -328,41 +366,55 @@ class TransactionDataView(generics.ListAPIView):
             # ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border above the header row
             ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
-            ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),# Add a horizontal border to the data rows
-        ]))
+            ('LINEABOVE', (0, -2), (-1, -2), 1, colors.black),# Add a horizontal border to the data rows
+            # ('BACKGROUND', (-1, 0), (-1, -1), colors.grey),  
+            ('BACKGROUND', (0, -2), (-1, -2), colors.grey),
+            ('BOTTOMPADDING', (0, -2), (-1, -2), 6),
+            ]))
+
+            content.append(transaction_table)
+            # content.append("\n\n")
+        
+        
         
         table_data = [['Title', 'Amount']]
+        income_sum = 0
         for incomes in user_income:
             data = IncomeSerializer(incomes).data
             Title = data['title']
             amount = data['amount']
-
-            table_data.append([Title,f"P {amount:.2f}"])
+            
+            table_data.append([Title,"P {:,.2f}".format(amount)])
+            income_value = float(amount)
+            income_sum += income_value
+        table_data.append(["Total Amount","P {:,.2f}".format(income_sum)])
 
         income_table = Table(table_data, colWidths=200, rowHeights=25)
         income_table.setStyle(TableStyle([
             # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.red),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
             # ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
             ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border above the header row
             ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
-            ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),  # Add a horizontal border to the data rows
+            ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.grey),
+            ('BOTTOMPADDING', (0, -1), (-1, -1), 6),  # Add a horizontal border to the data rows
         ]))
-
+        print(income_table)
         table_data = [['Category', 'Average']]
         for average in results_list:
             label = average['key']
             amount = average['value']
 
-            table_data.append([label,f"P {amount:.2f}"])
+            table_data.append([label,"P {:,.2f}".format(amount)])
 
         average_table = Table(table_data, colWidths=200, rowHeights=25)
         average_table.setStyle(TableStyle([
             # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.red),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
@@ -370,13 +422,35 @@ class TransactionDataView(generics.ListAPIView):
             ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border above the header row
             ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
             ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),  # Add a horizontal border to the data rows
+            ('BOTTOMPADDING', (0, -1), (-1, -1), 6),
         ]))
+
+
+        table_data = [[f'No of {period}(s)', 'Predicted Savings']]
+
+        table_data.append([no_months_to_predict,"P {:,.2f}".format(predicted_sums_per_category[3].sum())])
+
+        forecast_table = Table(table_data, colWidths=200, rowHeights=25)
+        forecast_table.setStyle(TableStyle([
+            # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.red),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            # ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border above the header row
+            ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
+            ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),  # Add a horizontal border to the data rows
+            ('BOTTOMPADDING', (0, -1), (-1, -1), 6),
+        ]))
+
+        
 
         # Build the PDF document
 
 
         
-        doc.build([doc_title, transaction_table,income_doc_title,income_table,average_doc_title,average_table])
+        doc.build([income_doc_title,income_table,doc_title,months_title, *content,average_doc_title,average_table,forecast_doc_title,forecast_table])
 
         pdf_value = pdf_buffer.getvalue()
 
