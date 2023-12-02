@@ -145,7 +145,7 @@ class GetAllTheSameMonth(generics.ListAPIView):
     def get_queryset(self):
         user = self.kwargs.get('user')
         # Group data by month and year and annotate with count
-        queryset = Transaction.objects.values('date').annotate(count=Count('id')).filter(user=user)
+        queryset = Transaction.objects.values('date').annotate(count=Count('id')).filter(user=user).order_by('date')
         
 
         return queryset
