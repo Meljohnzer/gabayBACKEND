@@ -119,10 +119,12 @@ class YourModelListView(generics.ListAPIView):
         # Extract month and year from query parameters
         # month = self.request.query_params.get('month')
         date = self.request.query_params.get('date')
+        desired_year = self.request.query_params.get('year')
         user = self.kwargs.get('user')
-        
+        year_transactions = Transaction.objects.filter(date__year=desired_year)
+
         # Get objects for the specified month and year, order by date
-        queryset = Transaction.objects.filter(date=date,user = user).order_by('date')
+        queryset = year_transactions.filter(date=date,user = user).order_by('date')
         
         # Create a paginator object
         paginator = Paginator(queryset, self.items_per_page)
@@ -138,17 +140,32 @@ class YourModelListView(generics.ListAPIView):
             page = paginator.page(1)
         
         return page
-    
+class GetAllYear(generics.ListAPIView):
+    serializer_class = DateSerializer
+
+    def get_queryset(self):
+        user = self.kwargs.get('user')
+
+        # Group data by month and year and annotate with count
+        queryset = Transaction.objects.values('date').annotate(count=Count('id')).filter(user=user).order_by('-date')
+        
+
+        return queryset
 class GetAllTheSameMonth(generics.ListAPIView):
     serializer_class = DateSerializer
 
     def get_queryset(self):
         user = self.kwargs.get('user')
+        desired_year = self.request.query_params.get('year')
+
+        year_transactions = Transaction.objects.filter(date__year=desired_year)
         # Group data by month and year and annotate with count
-        queryset = Transaction.objects.values('date').annotate(count=Count('id')).filter(user=user).order_by('date')
+        queryset = year_transactions.values('date').annotate(count=Count('id')).filter(user=user).order_by('date')
         
 
         return queryset
+    
+
     
 class SumIncome(generics.ListAPIView):
     serializer_class = SumIncomeSerializer
