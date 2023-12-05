@@ -242,21 +242,21 @@ class TransactionDataView(generics.ListAPIView):
         # nan_values_mask = pd.isna(pivot_table[3]).to_numpy()
 
 # Fill NaN values in pivot_table with the corresponding values from sum_of_all_categories
-        print(df)
+        # print(df)
         if (3, '') not in pivot_table.columns:
             pivot_table[(3, '')] = 0
             pivot_table.loc[:, (3, '')] = pivot_table.loc[:, (3, '')].fillna(0, axis=0)
             pivot_table[(3, 'Unique')] = sum_of_all_categories
 
 
-        print(pivot_table)
+        # print(pivot_table)
         results_list = []
 
         # num_categories = len(pivot_table.columns.levels[0])
         # weights = np.linspace(0.1, 1.0, num_categories)
         # weights /= weights.sum() 
         for category in pivot_table.columns.levels[0]:
-            print(f"WEIGHTED MOVING AVERAGE FORECAST '{category}'")
+            # print(f"WEIGHTED MOVING AVERAGE FORECAST '{category}'")
 
     # Select the specific category from the pivot table
             ts = pivot_table[category]
@@ -274,8 +274,8 @@ class TransactionDataView(generics.ListAPIView):
    
             predicted_sum = pd.Series([forecast] * int(no_months_to_predict), index=pd.date_range(start=ts.index[-1] + pd.offsets.MonthEnd(), periods=int(no_months_to_predict), freq='M'))
 
-            print(f"Predicted sum for '{category}' for each predicted month:")
-            print(predicted_sum.mean())
+            # print(f"Predicted sum for '{category}' for each predicted month:")
+            # print(predicted_sum.mean())
             mean_predicted_sum = predicted_sum.mean()
             category_labels = {1: 'Necessities', 2: 'Wants', 3: 'Savings'}
             results_list.append({
@@ -291,8 +291,8 @@ class TransactionDataView(generics.ListAPIView):
 # Sum the equal months for all categories
         sum_of_equal_months = pd.DataFrame(predicted_sums_per_category).sum(axis=1)
 
-        print("Sum of equal months for all categories:")
-        print(sum_of_equal_months)
+        # print("Sum of equal months for all categories:")
+        # print(sum_of_equal_months)
 
 # print("Average of total predicted sums for all categories:")
 # print(average_per_month)
@@ -354,7 +354,7 @@ class TransactionDataView(generics.ListAPIView):
             # Create a table for each month
             parse_data = datetime.strptime(month, "%Y-%m-%d")
             long = parse_data.strftime("%B %Y")
-            print(months)
+            # print(months)
             month_table_data = [["","",f"{long}","",""],['Category', "",'Description',"", 'Amount']]
             total_amount_sum = 0
             for transaction in transactions_group:
@@ -420,7 +420,7 @@ class TransactionDataView(generics.ListAPIView):
             ('BACKGROUND', (0, -1), (-1, -1), colors.grey),
             ('BOTTOMPADDING', (0, -1), (-1, -1), 6),  # Add a horizontal border to the data rows
         ]))
-        print(income_table)
+        # print(income_table)
         table_data = [['Category', 'Average']]
         for average in results_list:
             label = average['key']
