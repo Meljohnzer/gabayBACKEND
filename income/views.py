@@ -4,7 +4,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from django.http import HttpResponse
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle,Spacer,Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet,ParagraphStyle
 from django.core.mail import send_mail
 from django.db.models import Sum
 from django.conf import settings
@@ -273,7 +273,16 @@ class TransactionDataView(generics.ListAPIView):
 
    
             predicted_sum = pd.Series([forecast] * int(no_months_to_predict), index=pd.date_range(start=ts.index[-1] + pd.offsets.MonthEnd(), periods=int(no_months_to_predict), freq='M'))
+            actual_values = ts.sum(axis=1).values[-len(weighted_avg):]  # Use actual values corresponding to the forecast period
+            mse = np.mean((actual_values - weighted_avg)**2)
+            mae = np.mean(np.abs(actual_values - weighted_avg))
+            rmse = np.sqrt(mse)
 
+# Print MSE 
+            print("actual Values:",actual_values)
+            print("Mean Absolute Error (MAE):", mae)
+            print("Mean Squared Error (MSE):", category,mse)
+            print("Root Mean Squared Error (RMSE):", rmse)
             # print(f"Predicted sum for '{category}' for each predicted month:")
             # print(predicted_sum.mean())
             mean_predicted_sum = predicted_sum.mean()
@@ -444,6 +453,8 @@ class TransactionDataView(generics.ListAPIView):
 
 
         table_data = [[f'No of {period}(s)', 'Predicted Savings']]
+        if period == "Year":
+            no_months_to_predict /= 12
 
         table_data.append([no_months_to_predict,"P {:,.2f}".format(predicted_sums_per_category[3].sum())])
 
@@ -461,13 +472,29 @@ class TransactionDataView(generics.ListAPIView):
             ('BOTTOMPADDING', (0, -1), (-1, -1), 6),
         ]))
 
-        
+        header_style = getSampleStyleSheet()["Heading1"]
+        centered_header_style = ParagraphStyle(
+            'centered_header',
+            parent=header_style,
+            alignment=1,  # 0=left, 1=center, 2=right
+            fontSize=16,
+            spaceAfter=12,
+            textColor='white',  # Text color
+            backColor='blue',  # Background color
+        )
+
+        # Replace 'your_logo.png' with the actual path to your logo image file
+        # logo_path = 'your_logo.png'
+        # logo = Image(logo_path, width=50, height=50)  # Adjust the width and height as needed
+
+        header_text = "Gabay"
+        centered_header = Paragraph(header_text, centered_header_style)
 
         # Build the PDF document
 
 
         
-        doc.build([income_doc_title,income_table,doc_title,months_title, *content,average_doc_title,average_table,forecast_doc_title,forecast_table])
+        doc.build([centered_header,income_doc_title,income_table,doc_title,months_title, *content,average_doc_title,average_table,forecast_doc_title,forecast_table])
 
         pdf_value = pdf_buffer.getvalue()
 

@@ -24,12 +24,16 @@ class RegisterView(APIView):
     def post(self,request):
         data=request.data
         serializer = RegisterSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data['email']
+        email = serializer.initial_data['email']
         user = User.objects.filter(email = email).first()
-     
-        serializer.save()
-        return Response(
+
+        if user:
+            return Response('Email Already Exist!')
+        else:
+            serializer.is_valid(raise_exception=True)
+            email = serializer.validated_data['email']
+            serializer.save()
+            return Response(
           'Registered successfully!'
         )
 #To Acces All Current User
