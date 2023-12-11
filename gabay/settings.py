@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-o=1btec2=chyxu2x0ltz=dddjvb8t6b-2ku1^e9qnlsjn6+9%*
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['192.168.43.36']
+ALLOWED_HOSTS = ['meljohnzer.pythonanywhere.com']
 
 AUTH_USER_MODEL = 'userauth.User'
 
@@ -131,18 +131,18 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-EMAIL_HOST = 'sandbox.smtp.mailtrap.io'
-EMAIL_HOST_USER = 'e21f7cb3f7c819'
-EMAIL_HOST_PASSWORD = 'ee119062aa82b2'
-EMAIL_PORT = '2525'
+# EMAIL_HOST = 'sandbox.smtp.mailtrap.io'
+# EMAIL_HOST_USER = 'e21f7cb3f7c819'
+# EMAIL_HOST_PASSWORD = 'ee119062aa82b2'
+# EMAIL_PORT = '2525'
 
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.gmail.com'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = 'team.besagunsa@gmail.com' # Replace with your email
-# EMAIL_HOST_PASSWORD = 'ewpctbaoeyahlrek' # Replace with your email password
-# DEFAULT_FROM_EMAIL = 'team.besagunsa@gmail.com' # Replace with your email
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'team.gabay404@gmail.com' # Replace with your email
+EMAIL_HOST_PASSWORD = 'gnmvqavnhgtykxqi' # Replace with your email password
+DEFAULT_FROM_EMAIL = 'team.gabay404@gmail.com' # Replace with your email
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
