@@ -260,7 +260,7 @@ class TransactionDataView(generics.ListAPIView):
 
     # Select the specific category from the pivot table
             ts = pivot_table[category]
-            train_size = int(len(ts)*0.8)
+            train_size = int(len(ts)*1)
 
             train_data = ts.iloc[:train_size]
             test_data = ts.iloc[train_size:]
@@ -272,17 +272,28 @@ class TransactionDataView(generics.ListAPIView):
             weights = np.linspace(0.1, 1, len(train_data))  # Example: linearly increasing weights
             weights /= weights.sum()  # Normalize weights to ensure they sum to 1
             print(weights)
-            weighted_avg = np.convolve(train_data.sum(axis=1), weights[::-1], mode='valid')
+            # weighted_avg = np.convolve(train_data.sum(axis=1), weights[::-1], mode='valid')
+            forecast_series = pd.Series()
+            while len(train_data) < train_size + no_months_to_predict:
+                # Calculate weighted moving average for the current train_data
+                weighted_avg = np.convolve(train_data.sum(axis=1), weights[::-1], mode='valid')
+                forecast = weighted_avg[-1]
 
+        # Append the forecasted value to the train_data
+                last_date = train_data.index[-1]
+                next_date = last_date + pd.DateOffset(months=1)
+                # forecast_series = pd.Series([forecast], index=[next_date])
+                forecast_series[next_date] = forecast
+                train_data = pd.concat([train_data, pd.Series([forecast], index=[next_date]).to_frame()])
 
-            forecast = weighted_avg[-1]  # Use the last available weighted moving average value as the forecast
+            # forecast = weighted_avg[-1]  # Use the last available weighted moving average value as the forecast
 
 
             predicted_sum = pd.Series([forecast] * int(no_months_to_predict), index=pd.date_range(start=train_data.index[-1] + pd.offsets.MonthEnd(), periods=int(no_months_to_predict), freq='M'))
 
             # print(f"Predicted sum for '{category}' for each predicted month:")
             # print(predicted_sum.mean())
-            mean_predicted_sum = predicted_sum.mean()
+            mean_predicted_sum = forecast_series.mean()
             category_labels = {1: 'Necessities', 2: 'Wants', 3: 'Savings'}
             results_list.append({
                 'key': category_labels.get(category, f'Category_{category}'),
@@ -290,7 +301,7 @@ class TransactionDataView(generics.ListAPIView):
             })
 
     # Store the predictions in the dictionary for this category
-            predicted_sums_per_category[category] = predicted_sum
+            predicted_sums_per_category[category] = forecast_series
 
             print()
 
