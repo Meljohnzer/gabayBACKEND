@@ -265,7 +265,7 @@ class TransactionDataView(generics.ListAPIView):
             train_data = ts.iloc[:train_size]
             test_data = ts.iloc[train_size:]
 
-            if not train_size:
+            if len(ts) < 12:
                 train_data = ts
     # Calculate weighted moving average with weights [0.5, 0.3, 0.2]
             # weights = np.array([0.6, 0.2, 0.2])
