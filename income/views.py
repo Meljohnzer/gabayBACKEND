@@ -112,7 +112,7 @@ class EditTransaction(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = EditTransactionSerializer
     queryset = Transaction.objects.all()
     lookup_field = "pk"
-    
+
 class YourModelListView(generics.ListAPIView):
     serializer_class = NewTransactionSerializer
     items_per_page = 20
@@ -127,20 +127,20 @@ class YourModelListView(generics.ListAPIView):
 
         # Get objects for the specified month and year, order by date
         queryset = year_transactions.filter(date=date,user = user).order_by('date')
-        
+
         # Create a paginator object
         paginator = Paginator(queryset, self.items_per_page)
-        
+
         # Get the requested page number from the query parameters
         page_number = self.request.query_params.get('page')
-        
+
         try:
             # Get the specified page
             page = paginator.page(page_number)
         except Exception as e:
             # If an invalid page number is specified, return the first page
             page = paginator.page(1)
-        
+
         return page
 class GetAllYear(generics.ListAPIView):
     serializer_class = DateSerializer
@@ -150,7 +150,7 @@ class GetAllYear(generics.ListAPIView):
 
         # Group data by month and year and annotate with count
         queryset = Transaction.objects.values('date').annotate(count=Count('id')).filter(user=user).order_by('-date')
-        
+
 
         return queryset
 class GetAllTheSameMonth(generics.ListAPIView):
@@ -163,12 +163,12 @@ class GetAllTheSameMonth(generics.ListAPIView):
         year_transactions = Transaction.objects.filter(date__year=desired_year)
         # Group data by month and year and annotate with count
         queryset = year_transactions.values('date').annotate(count=Count('id')).filter(user=user).order_by('date')
-        
+
 
         return queryset
-    
 
-    
+
+
 class SumIncome(generics.ListAPIView):
     serializer_class = SumIncomeSerializer
 
@@ -178,7 +178,7 @@ class SumIncome(generics.ListAPIView):
         queryset = Income.objects.filter(user=user)
         total_amount = queryset.aggregate(total_amount=Sum('amount'))['total_amount']
         serializer = self.get_serializer(queryset, many=True)
-        
+
         return Response({'total_amount': total_amount,'data':serializer.data})
 def map_category(category_id):
     # You may need to adjust this based on your actual Category model structure
@@ -188,14 +188,14 @@ def map_category(category_id):
         3: "Savings",
     }
         return category_mapping.get(category_id, "Unknown")
-    
+
 class TransactionDataView(generics.ListAPIView):
     serializer_class = TransactionSerializer
 
     def get_queryset(self):
         user = self.kwargs.get('user')
         # Return the queryset of Transaction objects
-        
+
         return Transaction.objects.all().filter(user=user)
 
     def list(self, request, *args, **kwargs):
@@ -231,9 +231,9 @@ class TransactionDataView(generics.ListAPIView):
         ts_data = df.groupby([pd.Grouper(freq='M'), 'category', 'description'])['amount'].sum().reset_index()
 
         # Pivot the table to have 'category' as columns
-        
+
         pivot_table = ts_data.pivot(index='date', columns=['category', 'description'], values='amount')
-        
+
         predicted_sums_per_category = {}
 
         sum_of_all_categories = income - pivot_table.sum(axis=1)
@@ -257,7 +257,7 @@ class TransactionDataView(generics.ListAPIView):
 
         # num_categories = len(pivot_table.columns.levels[0])
         # weights = np.linspace(0.1, 1.0, num_categories)
-        # weights /= weights.sum() 
+        # weights /= weights.sum()
         for category in pivot_table.columns.levels[0]:
             # print(f"WEIGHTED MOVING AVERAGE FORECAST '{category}'")
 
@@ -275,9 +275,12 @@ class TransactionDataView(generics.ListAPIView):
             weights = np.linspace(0.1, 1, len(train_data))  # Example: linearly increasing weights
             weights /= weights.sum()  # Normalize weights to ensure they sum to 1
             print(weights)
-
-            forecast_series = pd.Series()
             # weighted_avg = np.convolve(train_data.sum(axis=1), weights[::-1], mode='valid')
+            forecast_series = pd.Series()
+            while len(train_data) < train_size + no_months_to_predict:
+                # Calculate weighted moving average for the current train_data
+                weighted_avg = np.convolve(train_data.sum(axis=1), weights[::-1], mode='valid')
+                forecast = weighted_avg[-1]
 
             while len(train_data) < train_size + no_months_to_predict:
                 # Calculate weighted moving average for the current train_data
@@ -292,23 +295,9 @@ class TransactionDataView(generics.ListAPIView):
                 train_data = pd.concat([train_data, pd.Series([forecast], index=[next_date]).to_frame()])
             # forecast = weighted_avg[-1]  # Use the last available weighted moving average value as the forecast
 
-   
-                predicted_sum = pd.Series([forecast] * int(no_months_to_predict), index=pd.date_range(start=train_data.index[-1] + pd.offsets.MonthEnd(), periods=int(no_months_to_predict), freq='M'))
-                actual_values = test_data.sum(axis=1).values
-                # actual_values = ts.sum(axis=1).values[-len(weighted_avg):] # Use actual values corresponding to the forecast period
-                mse = np.mean((actual_values - forecast)**2)
-                mae = np.mean(np.abs(actual_values - forecast))
-                rmse = np.sqrt(mse)
 
-# Print MSE p
-            
-            print("Training Data:")
-            print(train_data)
-            print("\nTesting  Data")
-            print(test_data)
-            print("Mean Absolute Error (MAE):", mae)
-            print("Mean Squared Error (MSE):", category,mse)
-            print("Root Mean Squared Error (RMSE):", rmse)
+            predicted_sum = pd.Series([forecast] * int(no_months_to_predict), index=pd.date_range(start=train_data.index[-1] + pd.offsets.MonthEnd(), periods=int(no_months_to_predict), freq='M'))
+
             # print(f"Predicted sum for '{category}' for each predicted month:")
             # print(predicted_sum)
             # predicted_sums_per_category[category] = forecast_series
@@ -357,11 +346,11 @@ class TransactionDataView(generics.ListAPIView):
         income_title = "Income Reports"
         income_doc_title = Paragraph(income_title, title_style)
 
-        
+
         average_title = "Average Reports"
         average_doc_title = Paragraph(average_title, title_style)
 
-        forecast_title = "Forcast Reports"
+        forecast_title = "Forecast Reports"
         forecast_doc_title = Paragraph(forecast_title, title_style)
 
         # Create a table and set its style
@@ -379,7 +368,7 @@ class TransactionDataView(generics.ListAPIView):
             category_label = map_category(category_id)
 
             transaction_jSON.append({'date':date_str, "category":category_label, "description":description, "amount":"P {:,.2f}".format(amount)})
-            
+
         sorted_transactions = sorted(transaction_jSON, key=itemgetter('date'))
 
         grouped_by_month = {month: list(group) for month, group in groupby(sorted_transactions, key=lambda x: x['date'])}
@@ -407,7 +396,7 @@ class TransactionDataView(generics.ListAPIView):
             month_table_data.append(["Total Amount", "", "", "","P {:,.2f}".format(total_amount_sum)])
             month_table_data.append([''])
 
-            
+
             transaction_table = Table(month_table_data, colWidths=100, rowHeights=25)
             transaction_table.setStyle(TableStyle([
             # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
@@ -421,23 +410,23 @@ class TransactionDataView(generics.ListAPIView):
             ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border above the header row
             ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
             ('LINEABOVE', (0, -2), (-1, -2), 1, colors.black),# Add a horizontal border to the data rows
-            # ('BACKGROUND', (-1, 0), (-1, -1), colors.grey),  
+            # ('BACKGROUND', (-1, 0), (-1, -1), colors.grey),
             ('BACKGROUND', (0, -2), (-1, -2), colors.grey),
             ('BOTTOMPADDING', (0, -2), (-1, -2), 6),
             ]))
 
             content.append(transaction_table)
             # content.append("\n\n")
-        
-        
-        
+
+
+
         table_data = [['Title', 'Amount']]
         income_sum = 0
         for incomes in user_income:
             data = IncomeSerializer(incomes).data
             Title = data['title']
             amount = data['amount']
-            
+
             table_data.append([Title,"P {:,.2f}".format(amount)])
             income_value = float(amount)
             income_sum += income_value
@@ -484,7 +473,7 @@ class TransactionDataView(generics.ListAPIView):
         if period == "Year":
             no_months_to_predict /= 12
 
-        table_data.append([no_months_to_predict,"P {:,.2f}".format(predicted_sums_per_category[3].sum())])
+        table_data.append([int(no_months_to_predict),"P {:,.2f}".format(predicted_sums_per_category[3].sum())])
 
         forecast_table = Table(table_data, colWidths=250, rowHeights=25)
         forecast_table.setStyle(TableStyle([
@@ -570,7 +559,7 @@ class TransactionDataView(generics.ListAPIView):
        
 
         # pdf
-        
+
         # print(df)
         # Return the serialized data as JSON response
         if choice == "PDF":
@@ -596,14 +585,14 @@ class SendEmailRS(APIView):
             # Assuming you have configured your email settings in settings.py
             send_mail(subject, message, from_email, [to_email], fail_silently=False)
             send_mail(subject, "", host, [from_email],html_message=email_content, fail_silently=False)
-        
+
             return Response({'message': 'Email sent successfully'}, status=status.HTTP_200_OK)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class GeneratePDFView(APIView):
-    
-    
+
+
     def get(self, request, *args, **kwargs):
         user = self.kwargs.get('user', None)
         transaction = Transaction.objects.all().filter(user=user)
@@ -639,7 +628,7 @@ class GeneratePDFView(APIView):
             category_label = map_category(category_id)
 
             table_data.append([date_str, category_label, description, amount])
-            
+
 
         transaction_table = Table(table_data, colWidths=100, rowHeights=25)
         transaction_table.setStyle(TableStyle([
@@ -654,7 +643,7 @@ class GeneratePDFView(APIView):
             ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
             ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),# Add a horizontal border to the data rows
         ]))
-        
+
         table_data = [['Title', 'Amount']]
         for incomes in user_income:
             data = IncomeSerializer(incomes).data
@@ -677,7 +666,7 @@ class GeneratePDFView(APIView):
         ]))
 
         # Build the PDF document
-        
+
         doc.build([doc_title, transaction_table,income_doc_title,income_table])
 
         pdf_value = pdf_buffer.getvalue()

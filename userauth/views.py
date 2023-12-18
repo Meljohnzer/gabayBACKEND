@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.core import serializers
 from django.contrib.auth.hashers import make_password, check_password
-from .models import * 
+from .models import *
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Count
@@ -29,11 +29,11 @@ class RegisterView(APIView):
 
         if user:
             return Response('Email Already Exist!')
-        else:
-            serializer.is_valid(raise_exception=True)
-            email = serializer.validated_data['email']
-            serializer.save()
-            return Response(
+
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+        serializer.save()
+        return Response(
           'Registered successfully!'
         )
 #To Acces All Current User
@@ -43,7 +43,7 @@ class RegisterViewAll(generics.ListAPIView):
     def get_queryset(self):
         queryset = User.objects.all()
         return queryset
-    
+
 class DelUserView(generics.RetrieveDestroyAPIView):
     serializer_class = RegisterSerializer
     queryset = User.objects.all()
@@ -69,11 +69,11 @@ class SendEmailVerification(APIView):
                     return Response({"Warning":"OTP Sent Successfully!", "status":status.HTTP_200_OK})
             else:
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+
         except Exception as e:
             print(e)
             return Response("Internal Server Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
 #Accepting Email And OTP to Verify Account
 class OTPVerification(APIView):
     def post(self,request):
@@ -97,12 +97,12 @@ class OTPVerification(APIView):
                 return Response({"Warning":"Email Verified", "status":status.HTTP_200_OK})
             else:
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-       
-        
+
+
         except Exception as e:
             print(e)
             return Response("Internal Server Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
 class Login(APIView):
   def post(self,request):
     try:
@@ -124,14 +124,14 @@ class Login(APIView):
                 return Response({"status" : status.HTTP_401_UNAUTHORIZED,"Warning" : "Account Not Verified"})
             if income.exists():
                  return JsonResponse({"status" : status.HTTP_100_CONTINUE,"Warning" : "Home","user" : user_data,"bol":income.exists()})
-            
+
             return JsonResponse({"user" : user_data ,"status": status.HTTP_200_OK,"bol":income.exists()})
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
             print(e)
             return JsonResponse({"Warning":"Incorrect Email or Password", "status" : status.HTTP_500_INTERNAL_SERVER_ERROR})
-    
+
 
 class SendEmailForgotVerification(APIView):
     def post(self,request):
@@ -150,7 +150,7 @@ class SendEmailForgotVerification(APIView):
                     return Response({"Warning":"OTP Sent Successfully!", "status":status.HTTP_200_OK})
             else:
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+
         except Exception as e:
             print(e)
             return Response("Internal Server Error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
