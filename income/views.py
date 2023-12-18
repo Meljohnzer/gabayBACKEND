@@ -5,6 +5,8 @@ from reportlab.lib import colors
 from django.http import HttpResponse
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle,Spacer,Paragraph
 from reportlab.lib.styles import getSampleStyleSheet,ParagraphStyle
+from PyPDF2 import PdfReader, PdfWriter,PdfMerger
+from reportlab.pdfgen import canvas as pdf_canvas
 from django.core.mail import send_mail
 from django.db.models import Sum
 from django.conf import settings
@@ -251,6 +253,7 @@ class TransactionDataView(generics.ListAPIView):
 
         # print(pivot_table)
         results_list = []
+        
 
         # num_categories = len(pivot_table.columns.levels[0])
         # weights = np.linspace(0.1, 1.0, num_categories)
@@ -260,32 +263,56 @@ class TransactionDataView(generics.ListAPIView):
 
     # Select the specific category from the pivot table
             ts = pivot_table[category]
+            train_size = int(len(ts)*1)
 
+            train_data = ts.iloc[:train_size]
+            test_data = ts.iloc[train_size:]
+
+            if len(ts) < 12:
+                train_data = ts 
     # Calculate weighted moving average with weights [0.5, 0.3, 0.2]
             # weights = np.array([0.6, 0.2, 0.2])
-            weights = np.linspace(0.1, 1, len(ts))  # Example: linearly increasing weights
+            weights = np.linspace(0.1, 1, len(train_data))  # Example: linearly increasing weights
             weights /= weights.sum()  # Normalize weights to ensure they sum to 1
             print(weights)
-            weighted_avg = np.convolve(ts.sum(axis=1), weights[::-1], mode='valid')
+
+            forecast_series = pd.Series()
+            # weighted_avg = np.convolve(train_data.sum(axis=1), weights[::-1], mode='valid')
+
+            while len(train_data) < train_size + no_months_to_predict:
+                # Calculate weighted moving average for the current train_data
+                weighted_avg = np.convolve(train_data.sum(axis=1), weights[::-1], mode='valid')
+                forecast = weighted_avg[-1]
+
+        # Append the forecasted value to the train_data
+                last_date = train_data.index[-1]
+                next_date = last_date + pd.DateOffset(months=1)
+                # forecast_series = pd.Series([forecast], index=[next_date])
+                forecast_series[next_date] = forecast
+                train_data = pd.concat([train_data, pd.Series([forecast], index=[next_date]).to_frame()])
+            # forecast = weighted_avg[-1]  # Use the last available weighted moving average value as the forecast
 
    
-            forecast = weighted_avg[-1]  # Use the last available weighted moving average value as the forecast
+                predicted_sum = pd.Series([forecast] * int(no_months_to_predict), index=pd.date_range(start=train_data.index[-1] + pd.offsets.MonthEnd(), periods=int(no_months_to_predict), freq='M'))
+                actual_values = test_data.sum(axis=1).values
+                # actual_values = ts.sum(axis=1).values[-len(weighted_avg):] # Use actual values corresponding to the forecast period
+                mse = np.mean((actual_values - forecast)**2)
+                mae = np.mean(np.abs(actual_values - forecast))
+                rmse = np.sqrt(mse)
 
-   
-            predicted_sum = pd.Series([forecast] * int(no_months_to_predict), index=pd.date_range(start=ts.index[-1] + pd.offsets.MonthEnd(), periods=int(no_months_to_predict), freq='M'))
-            actual_values = ts.sum(axis=1).values[-len(weighted_avg):]  # Use actual values corresponding to the forecast period
-            mse = np.mean((actual_values - weighted_avg)**2)
-            mae = np.mean(np.abs(actual_values - weighted_avg))
-            rmse = np.sqrt(mse)
-
-# Print MSE 
-            print("actual Values:",actual_values)
+# Print MSE p
+            
+            print("Training Data:")
+            print(train_data)
+            print("\nTesting  Data")
+            print(test_data)
             print("Mean Absolute Error (MAE):", mae)
             print("Mean Squared Error (MSE):", category,mse)
             print("Root Mean Squared Error (RMSE):", rmse)
             # print(f"Predicted sum for '{category}' for each predicted month:")
-            # print(predicted_sum.mean())
-            mean_predicted_sum = predicted_sum.mean()
+            # print(predicted_sum)
+            # predicted_sums_per_category[category] = forecast_series
+            mean_predicted_sum = forecast_series.mean()
             category_labels = {1: 'Necessities', 2: 'Wants', 3: 'Savings'}
             results_list.append({
                 'key': category_labels.get(category, f'Category_{category}'),
@@ -293,12 +320,13 @@ class TransactionDataView(generics.ListAPIView):
             })
 
     # Store the predictions in the dictionary for this category
-            predicted_sums_per_category[category] = predicted_sum
+            predicted_sums_per_category[category] = forecast_series
+
 
             print()
 
 # Sum the equal months for all categories
-        sum_of_equal_months = pd.DataFrame(predicted_sums_per_category).sum(axis=1)
+        # sum_of_equal_months = pd.DataFrame(predicted_sums_per_category).sum(axis=1)
 
         # print("Sum of equal months for all categories:")
         # print(sum_of_equal_months)
@@ -308,14 +336,14 @@ class TransactionDataView(generics.ListAPIView):
 
 # Here, use the numeric value '3' instead of the variable category
         print("Total saving that will be achieved in that time:")
-        print(predicted_sums_per_category[3].sum())
+        print(predicted_sums_per_category[3])
 
         # pdf -0808
         pdf_buffer = io.BytesIO()
-        response = HttpResponse(pdf_buffer.read(),content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename="Gabay_report.pdf"'
+        
 
         # Create a PDF document
+        
         
         doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
 
@@ -415,7 +443,7 @@ class TransactionDataView(generics.ListAPIView):
             income_sum += income_value
         table_data.append(["Total Amount","P {:,.2f}".format(income_sum)])
 
-        income_table = Table(table_data, colWidths=200, rowHeights=25)
+        income_table = Table(table_data, colWidths=250, rowHeights=25)
         income_table.setStyle(TableStyle([
             # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.red),
@@ -437,7 +465,7 @@ class TransactionDataView(generics.ListAPIView):
 
             table_data.append([label,"P {:,.2f}".format(amount)])
 
-        average_table = Table(table_data, colWidths=200, rowHeights=25)
+        average_table = Table(table_data, colWidths=250, rowHeights=25)
         average_table.setStyle(TableStyle([
             # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.red),
@@ -458,7 +486,7 @@ class TransactionDataView(generics.ListAPIView):
 
         table_data.append([no_months_to_predict,"P {:,.2f}".format(predicted_sums_per_category[3].sum())])
 
-        forecast_table = Table(table_data, colWidths=200, rowHeights=25)
+        forecast_table = Table(table_data, colWidths=250, rowHeights=25)
         forecast_table.setStyle(TableStyle([
             # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.red),
@@ -480,14 +508,14 @@ class TransactionDataView(generics.ListAPIView):
             fontSize=16,
             spaceAfter=12,
             textColor='white',  # Text color
-            backColor='blue',  # Background color
+          
         )
 
         # Replace 'your_logo.png' with the actual path to your logo image file
         # logo_path = 'your_logo.png'
         # logo = Image(logo_path, width=50, height=50)  # Adjust the width and height as needed
 
-        header_text = "Gabay"
+        header_text = "-"
         centered_header = Paragraph(header_text, centered_header_style)
 
         # Build the PDF document
@@ -498,7 +526,48 @@ class TransactionDataView(generics.ListAPIView):
 
         pdf_value = pdf_buffer.getvalue()
 
-        response.write(pdf_value)
+        existing_template_path = 'income/template.pdf'
+        existing_template_buffer = io.BytesIO()
+        with open(existing_template_path, 'rb') as existing_template_file:
+            existing_template_buffer.write(existing_template_file.read())
+        existing_template_reader = PdfReader(existing_template_buffer)
+
+        generated_pdf_reader = PdfReader(io.BytesIO(pdf_value))
+        pdf_writer = PdfWriter()
+        page_template = existing_template_reader.pages[0]
+        page_generated = generated_pdf_reader.pages[0]
+        # page_template.merge_page(page_generated)
+        # pdf_writer.add_page(page_template)
+
+        # for page_num in range(1, len(existing_template_reader.pages)):
+        #     page = existing_template_reader.pages[page_num]
+        #     pdf_writer.add_page(page)
+        # for page_num in range(len(existing_template_reader.pages)):
+        #     page_template = existing_template_reader.pages[page_num]
+        #     pdf_writer.add_page(page_template)
+
+        for page_num in range(len(generated_pdf_reader.pages)):
+            page_generated = generated_pdf_reader.pages[page_num]
+            page_template = existing_template_reader.pages[0]
+            if page_num == 0:
+                page_generated.merge_page(page_template)
+            pdf_writer.add_page(page_generated)
+        merged_pdf_buffer = io.BytesIO()
+        pdf_writer.write(merged_pdf_buffer)
+
+        merged_pdf_buffer.seek(0)
+        
+        # response.write(pdf_value)
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="Gabay_report.pdf"'
+
+    # Write the merged PDF content to the response
+        # pdf_merger.write(response)
+        pdf_writer.write(response)
+        # pdf_writer.stream.close()
+        # existing_template_buffer.close()
+        # pdf_buffer.close()
+       
 
         # pdf
         

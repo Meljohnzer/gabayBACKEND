@@ -11,6 +11,8 @@ mysqlclient = "*"
 pandas = "*"
 numpy = "*"
 reportlab = "*"
+pypdf = "*"
+pypdf2 = "*"
 
 [dev-packages]
 
