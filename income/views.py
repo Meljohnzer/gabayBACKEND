@@ -127,7 +127,7 @@ class YourModelListView(generics.ListAPIView):
         year_transactions = Transaction.objects.filter(date__year=desired_year)
 
         # Get objects for the specified month and year, order by date
-        queryset = year_transactions.filter(date=date,user = user).order_by('date')
+        queryset = year_transactions.filter(date=date,user = user).order_by('date','-category')
 
         # Create a paginator object
         paginator = Paginator(queryset, self.items_per_page)
@@ -197,11 +197,11 @@ class TransactionDataView(generics.ListAPIView):
         user = self.kwargs.get('user')
         # Return the queryset of Transaction objects
 
-        return Transaction.objects.all().filter(user=user)
+        return Transaction.objects.all().filter(user=user).order_by('-category')
 
     def list(self, request, *args, **kwargs):
         user = self.kwargs.get('user', None)
-        transaction = Transaction.objects.all().filter(user=user)
+        transaction = Transaction.objects.all().filter(user=user).order_by('-category')
         user_income = Income.objects.all().filter(user=user)
 
         queryset = self.get_queryset()
@@ -254,7 +254,7 @@ class TransactionDataView(generics.ListAPIView):
 
         # print(pivot_table)
         results_list = []
-        
+
 
         # num_categories = len(pivot_table.columns.levels[0])
         # weights = np.linspace(0.1, 1.0, num_categories)
@@ -270,7 +270,7 @@ class TransactionDataView(generics.ListAPIView):
             test_data = ts.iloc[train_size:]
 
             if len(ts) < 12:
-                train_data = ts 
+                train_data = ts
     # Calculate weighted moving average with weights [0.5, 0.3, 0.2]
             # weights = np.array([0.6, 0.2, 0.2])
             weights = np.linspace(0.1, 1, len(train_data))  # Example: linearly increasing weights
@@ -325,11 +325,11 @@ class TransactionDataView(generics.ListAPIView):
 
         # pdf -0808
         pdf_buffer = io.BytesIO()
-        
+
 
         # Create a PDF document
-        
-        
+
+
         doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
 
         title = " "
@@ -338,7 +338,7 @@ class TransactionDataView(generics.ListAPIView):
         custom_style = ParagraphStyle(
         'CustomStyle',
         fontSize=10,
-        fontName='Helvetica-Bold', 
+        fontName='Helvetica-Bold',
         alignment=1,
         spaceBefore=25,
         textColor= '#144714',
@@ -424,7 +424,7 @@ class TransactionDataView(generics.ListAPIView):
             ('LINEBELOW', (0, -2), (-1, -2),1, colors.black),
             ('BOTTOMPADDING', (0, -2), (-1, -2), 6),
             ('GRID', (-1, 0), (-2, -2), 1, colors.black),
-            
+
             ]))
 
             content.append(transaction_table)
@@ -452,7 +452,7 @@ class TransactionDataView(generics.ListAPIView):
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
             # ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black), 
+            ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),
               # Add a horizontal border above the header row
             ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
             ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
@@ -464,17 +464,17 @@ class TransactionDataView(generics.ListAPIView):
             #  ('GRID', (-1, 0), (-1, -1), 1, colors.black),
         ]))
         total = 0
-        
+
         # print(income_table)
         table_data = [['Average Reports','Category', 'Average']]
         for average in results_list:
             label = average['key']
             amount = average['value']
             total += amount
-        
+
             table_data.append(["",label,"P {:,.2f}".format(amount)])
         table_data.append(["Total Amount",'',"P {:,.2f}".format(total)])
-            
+
 
         average_table = Table(table_data, colWidths=204, rowHeights=25)
         average_table.setStyle(TableStyle([
@@ -523,7 +523,7 @@ class TransactionDataView(generics.ListAPIView):
             fontSize=16,
             spaceAfter=12,
             textColor='white',  # Text color
-          
+
         )
 
         # Replace 'your_logo.png' with the actual path to your logo image file
@@ -536,13 +536,13 @@ class TransactionDataView(generics.ListAPIView):
         # Build the PDF document
 
 
-        
-        doc.build([centered_header,centered_header,income_table,doc_title, *content,average_doc_title,average_table,forecast_doc_title,forecast_table])
+
+        doc.build([centered_header,centered_header,income_table,doc_title, *content,average_table,forecast_doc_title,forecast_table])
 
         pdf_value = pdf_buffer.getvalue()
 
-        existing_template_path = 'income/header.pdf'
-        footer_path = 'income/footer.pdf'
+        existing_template_path = '/home/Meljohnzer/gabayBACKEND/income/header.pdf'
+        footer_path = '/home/Meljohnzer/gabayBACKEND/income/footer.pdf'
         existing_template_buffer = io.BytesIO()
         with open(existing_template_path, 'rb') as existing_template_file:
             existing_template_buffer.write(existing_template_file.read())
@@ -579,7 +579,7 @@ class TransactionDataView(generics.ListAPIView):
         pdf_writer.write(merged_pdf_buffer)
 
         merged_pdf_buffer.seek(0)
-        
+
         # response.write(pdf_value)
         response = HttpResponse(content_type='application/pdf')
         response['Content-Disposition'] = 'attachment; filename="Gabay_report.pdf"'
@@ -590,7 +590,7 @@ class TransactionDataView(generics.ListAPIView):
         # pdf_writer.stream.close()
         # existing_template_buffer.close()
         # pdf_buffer.close()
-       
+
 
         # pdf
 

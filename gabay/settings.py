@@ -24,9 +24,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-o=1btec2=chyxu2x0ltz=dddjvb8t6b-2ku1^e9qnlsjn6+9%*'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ['192.168.43.36','meljohnzer.pythonanywhere.com','localhost','127.0.0.1']
+ALLOWED_HOSTS = ['meljohnzer.pythonanywhere.com']
 
 AUTH_USER_MODEL = 'userauth.User'
 
@@ -141,7 +141,7 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'team.gabay404@gmail.com' # Replace with your email
-EMAIL_HOST_PASSWORD = 'gnmvqavnhgtykxqi' # Replace with your email password
+EMAIL_HOST_PASSWORD = 'yoxxmjzlfpnopgyv' # Replace with your email password
 DEFAULT_FROM_EMAIL = 'team.gabay404@gmail.com' # Replace with your email
 
 # Default primary key field type
