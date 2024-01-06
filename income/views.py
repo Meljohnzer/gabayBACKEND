@@ -11,7 +11,7 @@ from reportlab.lib.units import inch
 from django.core.mail import send_mail
 from django.db.models import Sum
 from django.conf import settings
-from rest_framework import generics,status
+from rest_framework import generics,serializers,status
 from .serializers import (IncomeSerializer,
                           CategorySerializer,
                           EditIncomeSerializer,
@@ -24,7 +24,7 @@ from .serializers import (IncomeSerializer,
                           SumIncomeSerializer,
                           TransactionSerializer)
 from .models import *
-from django.db.models import Count
+from django.db.models import Count,F
 from rest_framework.response import Response
 from django.core.paginator import Paginator
 from django.http import JsonResponse
@@ -82,29 +82,39 @@ class AddCategory(generics.ListCreateAPIView):
 #     serializer_class = TransactionSerializer
 #     queryset = Transaction.objects.all()
 
-class AddTransaction(generics.ListCreateAPIView):
+class AddTransaction(generics.CreateAPIView):
     serializer_class = TransactionSerializer
 
-    def get_queryset(self):
+    def get_queryset(self,):
         # Group the data by the 'date' field and annotate it with the count of transactions
         queryset = Transaction.objects.annotate(transaction_count=Count('id'))
         return queryset
+        
 
-    def perform_create(self, serializer):
+    def perform_create(self, serializer,*args, **kwargs):
         user = serializer.validated_data['user']
         category = serializer.validated_data['category']
         date = serializer.validated_data['date']
         amount = serializer.validated_data['amount']
         description = serializer.validated_data['description']
+        overwrite = self.request.query_params.get('overwrite')
 
         # Check if a transaction with the same user, category, date, and description exists
         existing_transaction = Transaction.objects.filter(user=user, category=category, date=date, description=description).first()
 
         if existing_transaction:
             # If the transaction with the same description exists, update the amount
-            existing_transaction.amount += amount
-            existing_transaction.save()
-            return existing_transaction
+            if overwrite == "Yes":
+                existing_transaction.amount += amount
+                existing_transaction.save()
+                # return existing_transaction
+            else:
+                # Return an error response if 'overwrite' is not "Yes"
+                error_response = Response(
+                    {"code": status.HTTP_226_IM_USED, "error": "Invalid value for 'overwrite' parameter."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                raise serializers.ValidationError(error_response.data)   
         else:
             # If no existing transaction with the same description found, create a new one
             serializer.save()
@@ -163,7 +173,7 @@ class GetAllTheSameMonth(generics.ListAPIView):
 
         year_transactions = Transaction.objects.filter(date__year=desired_year)
         # Group data by month and year and annotate with count
-        queryset = year_transactions.values('date').annotate(count=Count('id')).filter(user=user).order_by('date')
+        queryset = year_transactions.values('date').annotate(count=Count('id')).filter(user=user).order_by('date','-category')
 
 
         return queryset
@@ -366,9 +376,7 @@ class TransactionDataView(generics.ListAPIView):
         for transactions in transaction:
             data = TransactionSerializer(transactions).data
             date_str = data['date']
-            user_id = data['user']
             category_id = data['category']
-            icon_id = data['icon']
             description = data['description']
             amount = data['amount']
 
@@ -557,15 +565,7 @@ class TransactionDataView(generics.ListAPIView):
         page_template = existing_template_reader.pages[0]
         footer_template = footer_reader.pages[0]
         page_generated = generated_pdf_reader.pages[0]
-        # page_template.merge_page(page_generated)
-        # pdf_writer.add_page(page_template)
-
-        # for page_num in range(1, len(existing_template_reader.pages)):
-        #     page = existing_template_reader.pages[page_num]
-        #     pdf_writer.add_page(page)
-        # for page_num in range(len(existing_template_reader.pages)):
-        #     page_template = existing_template_reader.pages[page_num]
-        #     pdf_writer.add_page(page_template)
+     
 
         for page_num in range(len(generated_pdf_reader.pages)):
             page_generated = generated_pdf_reader.pages[page_num]
@@ -580,22 +580,12 @@ class TransactionDataView(generics.ListAPIView):
 
         merged_pdf_buffer.seek(0)
 
-        # response.write(pdf_value)
+    
         response = HttpResponse(content_type='application/pdf')
         response['Content-Disposition'] = 'attachment; filename="Gabay_report.pdf"'
 
-    # Write the merged PDF content to the response
-        # pdf_merger.write(response)
         pdf_writer.write(response)
-        # pdf_writer.stream.close()
-        # existing_template_buffer.close()
-        # pdf_buffer.close()
-
-
-        # pdf
-
-        # print(df)
-        # Return the serialized data as JSON response
+        
         if choice == "PDF":
             return response
         else:
@@ -626,85 +616,204 @@ class SendEmailRS(APIView):
 
 class GeneratePDFView(APIView):
 
-
     def get(self, request, *args, **kwargs):
         user = self.kwargs.get('user', None)
-        transaction = Transaction.objects.all().filter(user=user)
+        year = self.request.query_params.get('year')
+        month = self.request.query_params.get('month')
+        freq = self.request.query_params.get('freq')
+        if freq == 'Yearly':
+            transaction = Transaction.objects.all().filter(user=user,date__year = year).order_by('date','category')
+        elif freq == 'Monthly':
+            transaction = Transaction.objects.all().filter(user=user,date = month).order_by('date','category')
+            year = month
         user_income = Income.objects.all().filter(user=user)
 
         # Create a response object with PDF content type
-        response = HttpResponse(content_type='application/pdf')
-        response['Content-Disposition'] = 'attachment; filename="income_report.pdf"'
+        
 
         # Create a PDF document
         pdf_buffer = io.BytesIO()
         doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
 
-        title = "Transaction Reports"
+        custom_style = ParagraphStyle(
+        'CustomStyle',
+        fontSize=10,
+        fontName='Helvetica-Bold',
+        alignment=1,
+        spaceBefore=25,
+        textColor= '#144714',
+        # Adjust spacing after paragraph
+        # topIndent=100,  # Adjust left margin
+        # rightIndent=inch,  # Adjust right margin
+    )
+
+        title = ""
         styles = getSampleStyleSheet()
         title_style = styles['Title']
-        doc_title = Paragraph(title, title_style)
+        doc_title = Paragraph(title, custom_style)
 
         income_title = "Income Reports"
-        income_doc_title = Paragraph(income_title, title_style)
+        income_doc_title = Paragraph(income_title, custom_style)
+
+   
+        months = "Transaction Reports"
+        months_title = Paragraph(months,custom_style)
 
         # Create a table and set its style
+        transaction_jSON = []
         table_data = [['Date', 'Category', 'Description', 'Amount']]
         for transactions in transaction:
             data = TransactionSerializer(transactions).data
             date_str = data['date']
-            user_id = data['user']
             category_id = data['category']
-            icon_id = data['icon']
             description = data['description']
             amount = data['amount']
 
             category_label = map_category(category_id)
 
-            table_data.append([date_str, category_label, description, amount])
+            transaction_jSON.append({'date':date_str, "category":category_label, "description":description, "amount":"P {:,.2f}".format(amount)})
+
+        sorted_transactions = sorted(transaction_jSON, key=itemgetter('date'))
+
+        grouped_by_month = {month: list(group) for month, group in groupby(sorted_transactions, key=lambda x: x['date'])}
+
+        content  = []
+
+        for month, transactions_group in grouped_by_month.items():
+            # content.append(f"{month}\n{'_' * 30}\n\n")
+            # Create a table for each month
+            parse_data = datetime.strptime(month, "%Y-%m-%d")
+            long = parse_data.strftime("%B %Y")
+            # print(months)
+            month_table_data = [[months_title,'',f"{long}"],['Category','Description', 'Amount']]
+            total_amount_sum = 0
+            for transaction in transactions_group:
+                date_str = transaction['date']
+                category_label = transaction['category']
+                description = transaction['description']
+                amount = transaction['amount']
+
+                month_table_data.append([category_label,description,amount])
+
+                amount_value = float(amount.split()[1].replace(',', ''))
+                total_amount_sum += amount_value
+            month_table_data.append(["Total Amount","","P {:,.2f}".format(total_amount_sum)])
+            month_table_data.append([''])
 
 
-        transaction_table = Table(table_data, colWidths=100, rowHeights=25)
-        transaction_table.setStyle(TableStyle([
-            # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            transaction_table = Table(month_table_data, colWidths=204, rowHeights=25)
+            transaction_table.setStyle(TableStyle([
+             ('BACKGROUND', (0, 0), (-1, 0), '#E3B448'),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.red),
+            ('TEXTCOLOR',  (0, 1), (-1, 1), '#144714'),
+            ('LINEBELOW',  (0, 1), (-1, 1), 1, colors.black),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             # ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#3A6B35')),
             # ('GRID', (0, 0), (-1, -1), 1, colors.black),
             ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border above the header row
             ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
-            ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),# Add a horizontal border to the data rows
-        ]))
+            ('LINEABOVE', (0, -2), (-1, -2), 1, colors.black),# Add a horizontal border to the data rows
+            # ('BACKGROUND', (-1, 0), (-1, -1), colors.grey),
+            ('BACKGROUND', (0, -2), (-1, -2), '#144714'),
+            ('TEXTCOLOR', (0, -2), (-1, -2), '#E3B448'),
+            ('LINEBELOW', (0, -2), (-1, -2),1, colors.black),
+            ('BOTTOMPADDING', (0, -2), (-1, -2), 6),
+            ('GRID', (-1, 0), (-2, -2), 1, colors.black),
 
-        table_data = [['Title', 'Amount']]
+            ]))
+
+            content.append(transaction_table)
+
+        table_data = [[income_doc_title,'Title', 'Amount']]
+        income_sum = 0
         for incomes in user_income:
             data = IncomeSerializer(incomes).data
             Title = data['title']
             amount = data['amount']
 
-            table_data.append([Title,amount])
+            table_data.append(['',Title,"P {:,.2f}".format(amount)])
+            income_value = float(amount)
+            income_sum += income_value
+        table_data.append(["Total Amount",'',"P {:,.2f}".format(income_sum)])
 
-        income_table = Table(table_data, colWidths=200, rowHeights=25)
+        income_table = Table(table_data, colWidths=204, rowHeights=25)
         income_table.setStyle(TableStyle([
-            # ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+            ('BACKGROUND', (0, 0), (-1, 0), '#E3B448'),
+            ('TEXTCOLOR', (0, 0), (-1, 0), '#144714'),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
             # ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border above the header row
+            ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),
+              # Add a horizontal border above the header row
             ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
-            ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),  # Add a horizontal border to the data rows
+            ('LINEABOVE', (0, -1), (-1, -1), 1, colors.black),
+            ('BACKGROUND', (0, -1), (-1, -1), '#144714'),
+            ('TEXTCOLOR', (0, -1), (-1, -1), '#E3B448'),
+            ('BOTTOMPADDING', (0, -1), (-1, -1), 6),  # Add a horizontal border to the data rows
+            ('GRID', (-1, 0), (-2, -1), 1, colors.black),  # Add a grid to the entire table
+            # ('GRID', (0, 0), (0, -1), 1, colors.black),
+            #  ('GRID', (-1, 0), (-1, -1), 1, colors.black),
         ]))
 
         # Build the PDF document
+        header_style = getSampleStyleSheet()["Heading1"]
+        centered_header_style = ParagraphStyle(
+            'centered_header',
+            parent=header_style,
+            alignment=1,  # 0=left, 1=center, 2=right
+            fontSize=16,
+            spaceAfter=12,
+            textColor='white',  # Text color
 
-        doc.build([doc_title, transaction_table,income_doc_title,income_table])
+
+        )
+        header_text = " "
+        centered_header = Paragraph(header_text, centered_header_style)
+
+
+        doc.build([centered_header,centered_header,income_table,doc_title,*content])
 
         pdf_value = pdf_buffer.getvalue()
 
-        response.write(pdf_value)
+        existing_template_path = '/home/Meljohnzer/gabayBACKEND/income/header.pdf'
+        footer_path = '/home/Meljohnzer/gabayBACKEND/income/footer.pdf'
+        existing_template_buffer = io.BytesIO()
+        with open(existing_template_path, 'rb') as existing_template_file:
+            existing_template_buffer.write(existing_template_file.read())
+        existing_template_reader = PdfReader(existing_template_buffer)
+
+        with open(footer_path, 'rb') as existing_template_file1:
+            existing_template_buffer.write(existing_template_file1.read())
+        footer_reader = PdfReader(existing_template_buffer)
+
+        generated_pdf_reader = PdfReader(io.BytesIO(pdf_value))
+        pdf_writer = PdfWriter()
+        page_template = existing_template_reader.pages[0]
+        footer_template = footer_reader.pages[0]
+        page_generated = generated_pdf_reader.pages[0]
+     
+
+        for page_num in range(len(generated_pdf_reader.pages)):
+            page_generated = generated_pdf_reader.pages[page_num]
+            page_template = existing_template_reader.pages[0]
+            if page_num == 0:
+                page_generated.merge_page(page_template)
+            if page_num == len(generated_pdf_reader.pages) -1:
+                page_generated.merge_page(footer_template)
+            pdf_writer.add_page(page_generated)
+        merged_pdf_buffer = io.BytesIO()
+        pdf_writer.write(merged_pdf_buffer)
+
+        merged_pdf_buffer.seek(0)
+
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="Gabay-{year}_{freq}_report.pdf"'
+
+        pdf_writer.write(response)
 
         return response
+    
+
