@@ -46,19 +46,27 @@ class AddIncome(generics.ListCreateAPIView):
         # Group the data by the 'date' field and annotate it with the count of transactions
         queryset = Income.objects.annotate(transaction_count=Count('id'))
         return queryset
-    def perform_create(self, serializer):
+    def perform_create(self, serializer,*args, **kwargs):
         user = serializer.validated_data['user']
         title = serializer.validated_data['title']
         amount = serializer.validated_data['amount']
-
+        overwrite = self.request.query_params.get('overwrite')
         # Check if a transaction with the same user, category, date, and description exists
         existing_transaction = Income.objects.filter(user=user, title=title).first()
 
         if existing_transaction:
             # If the transaction with the same description exists, update the amount
-            existing_transaction.amount += amount
-            existing_transaction.save()
-            return existing_transaction
+            if overwrite == "Yes":
+                existing_transaction.amount += amount
+                existing_transaction.save()
+                # return existing_transaction
+            else:
+                # Return an error response if 'overwrite' is not "Yes"
+                error_response = Response(
+                    {"code": status.HTTP_226_IM_USED, "error": "Invalid value for 'overwrite' parameter."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                raise serializers.ValidationError(error_response.data)
         else:
             # If no existing transaction with the same description found, create a new one
             serializer.save()
@@ -173,7 +181,7 @@ class GetAllTheSameMonth(generics.ListAPIView):
 
         year_transactions = Transaction.objects.filter(date__year=desired_year)
         # Group data by month and year and annotate with count
-        queryset = year_transactions.values('date').annotate(count=Count('id')).filter(user=user).order_by('date','-category')
+        queryset = year_transactions.values('date').annotate(count=Count('id')).filter(user=user).order_by('date')
 
 
         return queryset
@@ -230,6 +238,7 @@ class TransactionDataView(generics.ListAPIView):
         serializer = self.get_serializer(queryset, many=True)
 
         df = pd.DataFrame(serializer.data)
+        print(df.head())
         df['date'] = pd.to_datetime(df['date'])
         # Handle missing values (you can choose to use different methods)
         # For example, forward-fill to replace missing values
@@ -243,7 +252,7 @@ class TransactionDataView(generics.ListAPIView):
 
         # Pivot the table to have 'category' as columns
 
-        pivot_table = ts_data.pivot(index='date', columns=['category', 'description'], values='amount')
+        pivot_table = ts_data.pivot(index='date', columns=['category','description'], values='amount')
 
         predicted_sums_per_category = {}
 
@@ -257,13 +266,14 @@ class TransactionDataView(generics.ListAPIView):
 # Fill NaN values in pivot_table with the corresponding values from sum_of_all_categories
         # print(df)
         if (3, '') not in pivot_table.columns:
-            pivot_table[(3, '')] = 0
-            pivot_table.loc[:, (3, '')] = pivot_table.loc[:, (3, '')].fillna(0, axis=0)
-            pivot_table[(3, 'Unique')] = sum_of_all_categories
+            # pivot_table[(3, '')] = 0
+            # pivot_table.loc[:, (3, '')] = pivot_table.loc[:, (3, '')].fillna(0, axis=0)
+            pivot_table[(3, 'Extra')] = sum_of_all_categories
 
 
         # print(pivot_table)
         results_list = []
+        saving_list = []
 
 
         # num_categories = len(pivot_table.columns.levels[0])
@@ -275,9 +285,12 @@ class TransactionDataView(generics.ListAPIView):
     # Select the specific category from the pivot table
             ts = pivot_table[category]
             train_size = int(len(ts)*1)
+           
 
             train_data = ts.iloc[:train_size]
             test_data = ts.iloc[train_size:]
+            
+
 
             if len(ts) < 12:
                 train_data = ts
@@ -285,20 +298,57 @@ class TransactionDataView(generics.ListAPIView):
             # weights = np.array([0.6, 0.2, 0.2])
             weights = np.linspace(0.1, 1, len(train_data))  # Example: linearly increasing weights
             weights /= weights.sum()  # Normalize weights to ensure they sum to 1
-            print(weights)
+            # print(weights)
             # weighted_avg = np.convolve(train_data.sum(axis=1), weights[::-1], mode='valid')
             forecast_series = pd.Series()
+            Sforecast_series =pd.Series()
+            if category == 3:
+                # print(train_data['Extra'])
+                for description in train_data:
+    
+                    while len(train_data) < train_size + no_months_to_predict:
+                        train_data.loc[:, description] = train_data[description].fillna(0)
+                        savings_avg = np.convolve(train_data[description], weights[::-1], mode='valid')
+                        Sv_forecast = savings_avg[-1]
+
+                        slast_date = train_data[description].index[-1]
+                        snext_date = slast_date + pd.DateOffset(months=1)
+
+                        Sforecast_series[snext_date] = Sv_forecast
+                        train_data.loc[snext_date, description] = Sv_forecast
+                    filter = df[df['description'] == description]
+                    icon = filter['icon'].unique()
+                    icons = 0
+                    if len(icon) > 0: 
+                        icons = icon[0]
+                    else:
+                        icons = 42
+                    Saving_predicted_sum = Sforecast_series.sum()
+                    rounded_saving_sum = round(Saving_predicted_sum, 2)
+                    saving_list.append({
+                        'key': description,
+                        'value':rounded_saving_sum.tolist(),
+                        'icon' : icons
+                    })
+                    
+                    print(Sforecast_series.sum())
+                    train_data = ts.iloc[:train_size]
+
+                    # print(len(train_data[description]))
+                        # print(savings_avg)
+
             while len(train_data) < train_size + no_months_to_predict:
                 # Calculate weighted moving average for the current train_data
                 weighted_avg = np.convolve(train_data.sum(axis=1), weights[::-1], mode='valid')
                 forecast = weighted_avg[-1]
-
+                
         # Append the forecasted value to the train_data
                 last_date = train_data.index[-1]
                 next_date = last_date + pd.DateOffset(months=1)
                 # forecast_series = pd.Series([forecast], index=[next_date])
                 forecast_series[next_date] = forecast
                 train_data = pd.concat([train_data, pd.Series([forecast], index=[next_date]).to_frame()])
+                # print(train_data)
             # forecast = weighted_avg[-1]  # Use the last available weighted moving average value as the forecast
 
 
@@ -331,7 +381,7 @@ class TransactionDataView(generics.ListAPIView):
 
 # Here, use the numeric value '3' instead of the variable category
         print("Total saving that will be achieved in that time:")
-        print(predicted_sums_per_category[3])
+        print(predicted_sums_per_category[3].sum())
 
         # pdf -0808
         pdf_buffer = io.BytesIO()
@@ -502,13 +552,35 @@ class TransactionDataView(generics.ListAPIView):
         ]))
 
 
-        table_data = [['Forecast Report',f'No of {period}(s)', 'Predicted Savings']]
+        table_data = [['OverAll Saving Forecast Report',f'No of {period}(s)', 'Predicted Amount']]
         if period == "Year":
             no_months_to_predict /= 12
 
         table_data.append(['',int(no_months_to_predict),"P {:,.2f}".format(predicted_sums_per_category[3].sum())])
         forecast_table = Table(table_data, colWidths=204, rowHeights=25)
         forecast_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), '#E3B448'),
+            ('TEXTCOLOR', (0, 0), (-1, 0), '#144714'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ('BACKGROUND', (0, 1), (-1, -1), '#144714'),
+            ('TEXTCOLOR', (0, 1), (-1, -1), '#E3B448'),
+            ('LINEABOVE', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border above the header row
+            ('LINEBELOW', (0, 0), (-1, 0), 1, colors.black),  # Add a horizontal border below the header row
+            ('LINEBELOW', (0, -1), (-1, -1), 1, colors.black),  # Add a horizontal border to the data rows
+            ('BOTTOMPADDING', (0, -1), (-1, -1), 6),
+            ('GRID', (-1, 0), (-2, -1), 1, colors.black),
+        ]))
+
+        table_data = [['Savings','Description', 'Forecast Amount']]
+        for forecast in saving_list:
+            description = forecast['key']
+            amount = forecast['value']
+            # total += amount
+            table_data.append(["",description,"P {:,.2f}".format(amount)])
+        savings_table = Table(table_data, colWidths=204, rowHeights=25)
+        savings_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), '#E3B448'),
             ('TEXTCOLOR', (0, 0), (-1, 0), '#144714'),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -545,12 +617,12 @@ class TransactionDataView(generics.ListAPIView):
 
 
 
-        doc.build([centered_header,centered_header,income_table,doc_title, *content,average_table,forecast_doc_title,forecast_table])
+        doc.build([centered_header,centered_header,income_table,doc_title, *content,average_table,forecast_doc_title,forecast_table,forecast_doc_title,savings_table])
 
         pdf_value = pdf_buffer.getvalue()
 
-        existing_template_path = '/home/Meljohnzer/gabayBACKEND/income/header.pdf'
-        footer_path = '/home/Meljohnzer/gabayBACKEND/income/footer.pdf'
+        existing_template_path = 'income/header.pdf'
+        footer_path = 'income/footer.pdf'
         existing_template_buffer = io.BytesIO()
         with open(existing_template_path, 'rb') as existing_template_file:
             existing_template_buffer.write(existing_template_file.read())
@@ -589,7 +661,7 @@ class TransactionDataView(generics.ListAPIView):
         if choice == "PDF":
             return response
         else:
-            return Response({"avarage" : results_list,"forecast":predicted_sums_per_category[3].sum()})
+            return Response({"avarage" : results_list,"saving_description":saving_list,"forecast":"{:,.2f}".format(predicted_sums_per_category[3].sum())})
 
 class SendEmailRS(APIView):
     def post(self, request, *args, **kwargs):
@@ -778,8 +850,8 @@ class GeneratePDFView(APIView):
 
         pdf_value = pdf_buffer.getvalue()
 
-        existing_template_path = '/home/Meljohnzer/gabayBACKEND/income/header.pdf'
-        footer_path = '/home/Meljohnzer/gabayBACKEND/income/footer.pdf'
+        existing_template_path = 'income/header.pdf'
+        footer_path = 'income/footer.pdf'
         existing_template_buffer = io.BytesIO()
         with open(existing_template_path, 'rb') as existing_template_file:
             existing_template_buffer.write(existing_template_file.read())
