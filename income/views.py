@@ -97,7 +97,7 @@ class AddTransaction(generics.CreateAPIView):
         # Group the data by the 'date' field and annotate it with the count of transactions
         queryset = Transaction.objects.annotate(transaction_count=Count('id'))
         return queryset
-        
+
 
     def perform_create(self, serializer,*args, **kwargs):
         user = serializer.validated_data['user']
@@ -122,7 +122,7 @@ class AddTransaction(generics.CreateAPIView):
                     {"code": status.HTTP_226_IM_USED, "error": "Invalid value for 'overwrite' parameter."},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-                raise serializers.ValidationError(error_response.data)   
+                raise serializers.ValidationError(error_response.data)
         else:
             # If no existing transaction with the same description found, create a new one
             serializer.save()
@@ -181,7 +181,7 @@ class GetAllTheSameMonth(generics.ListAPIView):
 
         year_transactions = Transaction.objects.filter(date__year=desired_year)
         # Group data by month and year and annotate with count
-        queryset = year_transactions.values('date').annotate(count=Count('id')).filter(user=user).order_by('date')
+        queryset = year_transactions.values('date').annotate(count=Count('id')).filter(user=user).order_by('-date')
 
 
         return queryset
@@ -268,7 +268,7 @@ class TransactionDataView(generics.ListAPIView):
         if (3, '') not in pivot_table.columns:
             # pivot_table[(3, '')] = 0
             # pivot_table.loc[:, (3, '')] = pivot_table.loc[:, (3, '')].fillna(0, axis=0)
-            pivot_table[(3, 'Extra')] = sum_of_all_categories
+            pivot_table[(3, 'Unallocated Income')] = sum_of_all_categories
 
 
         # print(pivot_table)
@@ -285,11 +285,11 @@ class TransactionDataView(generics.ListAPIView):
     # Select the specific category from the pivot table
             ts = pivot_table[category]
             train_size = int(len(ts)*1)
-           
+
 
             train_data = ts.iloc[:train_size]
             test_data = ts.iloc[train_size:]
-            
+
 
 
             if len(ts) < 12:
@@ -305,7 +305,7 @@ class TransactionDataView(generics.ListAPIView):
             if category == 3:
                 # print(train_data['Extra'])
                 for description in train_data:
-    
+
                     while len(train_data) < train_size + no_months_to_predict:
                         train_data.loc[:, description] = train_data[description].fillna(0)
                         savings_avg = np.convolve(train_data[description], weights[::-1], mode='valid')
@@ -319,7 +319,7 @@ class TransactionDataView(generics.ListAPIView):
                     filter = df[df['description'] == description]
                     icon = filter['icon'].unique()
                     icons = 0
-                    if len(icon) > 0: 
+                    if len(icon) > 0:
                         icons = icon[0]
                     else:
                         icons = 42
@@ -330,7 +330,7 @@ class TransactionDataView(generics.ListAPIView):
                         'value':rounded_saving_sum.tolist(),
                         'icon' : icons
                     })
-                    
+
                     print(Sforecast_series.sum())
                     train_data = ts.iloc[:train_size]
 
@@ -341,7 +341,7 @@ class TransactionDataView(generics.ListAPIView):
                 # Calculate weighted moving average for the current train_data
                 weighted_avg = np.convolve(train_data.sum(axis=1), weights[::-1], mode='valid')
                 forecast = weighted_avg[-1]
-                
+
         # Append the forecasted value to the train_data
                 last_date = train_data.index[-1]
                 next_date = last_date + pd.DateOffset(months=1)
@@ -621,8 +621,8 @@ class TransactionDataView(generics.ListAPIView):
 
         pdf_value = pdf_buffer.getvalue()
 
-        existing_template_path = 'income/header.pdf'
-        footer_path = 'income/footer.pdf'
+        existing_template_path = '/home/Meljohnzer/gabayBACKEND/income/header.pdf'
+        footer_path = '/home/Meljohnzer/gabayBACKEND/income/footer.pdf'
         existing_template_buffer = io.BytesIO()
         with open(existing_template_path, 'rb') as existing_template_file:
             existing_template_buffer.write(existing_template_file.read())
@@ -637,7 +637,7 @@ class TransactionDataView(generics.ListAPIView):
         page_template = existing_template_reader.pages[0]
         footer_template = footer_reader.pages[0]
         page_generated = generated_pdf_reader.pages[0]
-     
+
 
         for page_num in range(len(generated_pdf_reader.pages)):
             page_generated = generated_pdf_reader.pages[page_num]
@@ -652,12 +652,12 @@ class TransactionDataView(generics.ListAPIView):
 
         merged_pdf_buffer.seek(0)
 
-    
+
         response = HttpResponse(content_type='application/pdf')
         response['Content-Disposition'] = 'attachment; filename="Gabay_report.pdf"'
 
         pdf_writer.write(response)
-        
+
         if choice == "PDF":
             return response
         else:
@@ -701,7 +701,7 @@ class GeneratePDFView(APIView):
         user_income = Income.objects.all().filter(user=user)
 
         # Create a response object with PDF content type
-        
+
 
         # Create a PDF document
         pdf_buffer = io.BytesIO()
@@ -727,7 +727,7 @@ class GeneratePDFView(APIView):
         income_title = "Income Reports"
         income_doc_title = Paragraph(income_title, custom_style)
 
-   
+
         months = "Transaction Reports"
         months_title = Paragraph(months,custom_style)
 
@@ -850,8 +850,8 @@ class GeneratePDFView(APIView):
 
         pdf_value = pdf_buffer.getvalue()
 
-        existing_template_path = 'income/header.pdf'
-        footer_path = 'income/footer.pdf'
+        existing_template_path = '/home/Meljohnzer/gabayBACKEND/income/header.pdf'
+        footer_path = '/home/Meljohnzer/gabayBACKEND/income/footer.pdf'
         existing_template_buffer = io.BytesIO()
         with open(existing_template_path, 'rb') as existing_template_file:
             existing_template_buffer.write(existing_template_file.read())
@@ -866,7 +866,7 @@ class GeneratePDFView(APIView):
         page_template = existing_template_reader.pages[0]
         footer_template = footer_reader.pages[0]
         page_generated = generated_pdf_reader.pages[0]
-     
+
 
         for page_num in range(len(generated_pdf_reader.pages)):
             page_generated = generated_pdf_reader.pages[page_num]
@@ -887,5 +887,5 @@ class GeneratePDFView(APIView):
         pdf_writer.write(response)
 
         return response
-    
+
 
