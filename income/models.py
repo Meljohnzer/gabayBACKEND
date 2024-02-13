@@ -9,6 +9,10 @@ class Income(models.Model):
     icon = models.CharField(null=True,max_length=124)
     color = models.CharField(max_length=124,null=True)
 
+class Fixsaving(models.Model):
+    user = models.ForeignKey(User,on_delete=models.CASCADE)
+    amount = models.IntegerField()
+
 
 class Category(models.Model):
     title = models.CharField(max_length=64)

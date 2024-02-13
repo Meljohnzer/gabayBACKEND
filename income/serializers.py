@@ -72,3 +72,9 @@ class SendMailSerializer(serializers.Serializer):
     from_email = serializers.EmailField()
     subject = serializers.CharField()
     message = serializers.CharField()
+
+class FixSavingsSerializer(serializers.Serializer):
+
+    class Meta:
+        model = Fixsaving
+        fields = '__all__'

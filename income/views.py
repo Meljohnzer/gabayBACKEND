@@ -9,7 +9,7 @@ from PyPDF2 import PdfReader, PdfWriter,PdfMerger
 from reportlab.pdfgen import canvas as pdf_canvas
 from reportlab.lib.units import inch
 from django.core.mail import send_mail
-from django.db.models import Sum
+from django.db.models import Sum,Q
 from django.conf import settings
 from rest_framework import generics,serializers,status
 from .serializers import (IncomeSerializer,
@@ -21,6 +21,7 @@ from .serializers import (IncomeSerializer,
                           DateSerializer,
                           SendMailSerializer,
                           NewTransactionSerializer,
+                          FixSavingsSerializer,
                           SumIncomeSerializer,
                           TransactionSerializer)
 from .models import *
@@ -109,12 +110,40 @@ class AddTransaction(generics.CreateAPIView):
 
         # Check if a transaction with the same user, category, date, and description exists
         existing_transaction = Transaction.objects.filter(user=user, category=category, date=date, description=description).first()
+        query = Transaction.objects.filter(Q(date=date) & Q(user=user) & (Q(category=1) | Q(category=2)))
+        query0 = Transaction.objects.filter(date=date,user = user,category = 3)
+        query1 = Income.objects.filter(user=user)
+        query2 = Fixsaving.objects.filter(user=user)
+
+        get_sav_sum  = query0.aggregate(savings_sum = Sum('amount'))['savings_sum'] or 0
+        get_income = query1.aggregate(inc_sum = Sum('amount'))['inc_sum'] or 0
+        get_sum = query.aggregate(trans_sum =Sum('amount'))['trans_sum'] or 0
+        get_savings =query2.aggregate(save_sum= Sum('amount'))['save_sum'] or 0
+
+
+        income = get_income - get_savings
+        if category.pk == 1 or category.pk == 2:
+            compare = income - get_sum
+        else:
+            compare = get_savings - get_sav_sum
+            
+
+
+        print(category.pk == 1)
 
         if existing_transaction:
             # If the transaction with the same description exists, update the amount
             if overwrite == "Yes":
-                existing_transaction.amount += amount
-                existing_transaction.save()
+                if amount <= compare:
+                    existing_transaction.amount += amount
+                    existing_transaction.save()
+                else:
+                    error_response = Response(
+                    {"code": status.HTTP_205_RESET_CONTENT, "error": f"Maximum Value Reach {compare} is allowed"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                    raise serializers.ValidationError(error_response.data)
+
                 # return existing_transaction
             else:
                 # Return an error response if 'overwrite' is not "Yes"
@@ -125,12 +154,22 @@ class AddTransaction(generics.CreateAPIView):
                 raise serializers.ValidationError(error_response.data)
         else:
             # If no existing transaction with the same description found, create a new one
-            serializer.save()
+                if amount <= compare:
+                    serializer.save()
+                else:
+                    error_response = Response(
+                    {"code": status.HTTP_205_RESET_CONTENT, "error": f"Maximum Value Reach {compare} is allowed"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                    raise serializers.ValidationError(error_response.data)
 
 class EditTransaction(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = EditTransactionSerializer
     queryset = Transaction.objects.all()
     lookup_field = "pk"
+
+    
+
 
 class YourModelListView(generics.ListAPIView):
     serializer_class = NewTransactionSerializer
@@ -887,5 +926,19 @@ class GeneratePDFView(APIView):
         pdf_writer.write(response)
 
         return response
+
+class AddFixedSavingsViews(generics.ListCreateAPIView):
+    serializer_class = FixSavingsSerializer
+    queryset = Fixsaving.objects.all()
+
+class UpdateFixedSavingsViews(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = FixSavingsSerializer
+    queryset = Fixsaving.objects.all()
+    lookup_field = 'user'
+
+
+
+
+
 
 

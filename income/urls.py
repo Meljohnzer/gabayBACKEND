@@ -15,4 +15,6 @@ urlpatterns = [
     path('transaction-data/<int:user>/', TransactionDataView.as_view(), name='transaction-data'),
     path('report/problem/',SendEmailRS.as_view()),
     path('generate-pdf/<int:user>/', GeneratePDFView.as_view(), name='generate-pdf'),
+    path('add/fixed/savings/<int:user>/',AddFixedSavingsViews.as_view()),
+    path('update/fixed/savings/<int:user>/',UpdateFixedSavingsViews.as_view()),
     ]
