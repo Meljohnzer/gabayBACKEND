@@ -3,7 +3,7 @@ from .models import *
 from django.db.models import Sum
 
 class IncomeSerializer(serializers.ModelSerializer):
-    
+
     class Meta:
         model = Income
         fields = '__all__'
@@ -43,7 +43,7 @@ class YourGroupedDataSerializer(serializers.Serializer):
         fields = '__all__'
 
 class DateSerializer(serializers.ModelSerializer):
-    
+
     class Meta:
         model = Transaction
         fields = ['date']
@@ -60,7 +60,7 @@ class SumIncomeSerializer(serializers.ModelSerializer):
         queryset = Income.objects.filter(user=obj.user)
         total_amount = queryset.aggregate(total_amount=Sum('amount'))['total_amount']
         return total_amount
-    
+
 
 class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -73,7 +73,7 @@ class SendMailSerializer(serializers.Serializer):
     subject = serializers.CharField()
     message = serializers.CharField()
 
-class FixSavingsSerializer(serializers.Serializer):
+class FixSavingsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Fixsaving

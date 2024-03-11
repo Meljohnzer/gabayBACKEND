@@ -126,7 +126,7 @@ class AddTransaction(generics.CreateAPIView):
             compare = income - get_sum
         else:
             compare = get_savings - get_sav_sum
-            
+
 
 
         print(category.pk == 1)
@@ -139,7 +139,7 @@ class AddTransaction(generics.CreateAPIView):
                     existing_transaction.save()
                 else:
                     error_response = Response(
-                    {"code": status.HTTP_205_RESET_CONTENT, "error": f"Maximum Value Reach {compare} is allowed"},
+                    {"code": status.HTTP_205_RESET_CONTENT, "value":compare,"category":category.pk},
                     status=status.HTTP_400_BAD_REQUEST
                 )
                     raise serializers.ValidationError(error_response.data)
@@ -158,7 +158,7 @@ class AddTransaction(generics.CreateAPIView):
                     serializer.save()
                 else:
                     error_response = Response(
-                    {"code": status.HTTP_205_RESET_CONTENT, "error": f"Maximum Value Reach {compare} is allowed"},
+                    {"code": status.HTTP_205_RESET_CONTENT, "value": compare,"category":category.pk},
                     status=status.HTTP_400_BAD_REQUEST
                 )
                     raise serializers.ValidationError(error_response.data)
@@ -168,7 +168,7 @@ class EditTransaction(generics.RetrieveUpdateDestroyAPIView):
     queryset = Transaction.objects.all()
     lookup_field = "pk"
 
-    
+
 
 
 class YourModelListView(generics.ListAPIView):
@@ -293,21 +293,27 @@ class TransactionDataView(generics.ListAPIView):
 
         pivot_table = ts_data.pivot(index='date', columns=['category','description'], values='amount')
 
+
         predicted_sums_per_category = {}
 
-        sum_of_all_categories = income - pivot_table.sum(axis=1)
-
-# Reindex sum_of_all_categories to match the index of pivot_table
-        sum_of_all_categories = sum_of_all_categories.reindex(pivot_table.index)
         # sum_of_all_categories_array = sum_of_all_categories.to_numpy()
         # nan_values_mask = pd.isna(pivot_table[3]).to_numpy()
 
 # Fill NaN values in pivot_table with the corresponding values from sum_of_all_categories
         # print(df)
         if (3, '') not in pivot_table.columns:
+            p_table = ts_data[ts_data.category == 3].pivot(index='date',columns = ['category','description'], values = 'amount')
+            sum_of_all_categories = income - p_table.sum(axis=1)
+            # Reindex sum_of_all_categories to match the index of pivot_table
+            sum_of_all_categories = sum_of_all_categories.reindex(pivot_table.index)
+
             # pivot_table[(3, '')] = 0
             # pivot_table.loc[:, (3, '')] = pivot_table.loc[:, (3, '')].fillna(0, axis=0)
-            pivot_table[(3, 'Unallocated Income')] = sum_of_all_categories
+            pivot_table[(3, 'Unallocated Savings')] = sum_of_all_categories
+            pivot_table[(3, 'Unallocated Savings')] = pivot_table[(3, 'Unallocated Savings')].fillna(income)
+            # Replace zero values with 100
+
+
 
 
         # print(pivot_table)
@@ -364,9 +370,23 @@ class TransactionDataView(generics.ListAPIView):
                         icons = 42
                     Saving_predicted_sum = Sforecast_series.sum()
                     rounded_saving_sum = round(Saving_predicted_sum, 2)
+
+                    chart_data = []
+                    chart_date = []
+                    for date, amount in Sforecast_series.items():
+                        chart_data.append(amount)
+                        chart_date.append(date.strftime('%Y-%m-%d'))
+                       # chart_data.append({
+                    #        'amount':amount,
+                   #         'date' :date.strftime('%Y-%m-%d')
+                     #       })
+
+
                     saving_list.append({
                         'key': description,
                         'value':rounded_saving_sum.tolist(),
+                        'chart_data':chart_data,
+                        'chart_date':chart_date,
                         'icon' : icons
                     })
 
