@@ -956,6 +956,37 @@ class UpdateFixedSavingsViews(generics.RetrieveUpdateDestroyAPIView):
     queryset = Fixsaving.objects.all()
     lookup_field = 'user'
 
+class GetActualDataViews(generics.ListAPIView):
+    serializer_class = TransactionSerializer
+
+    def get_queryset(self):
+        user = self.request.query_params.get('user')
+        date = self.request.query_params.get('date')
+        description = self.request.query_params.get('description')
+
+        # Filter queryset based on user, date, and description
+        queryset = Transaction.objects.filter(user=user)
+        if date:
+            queryset = queryset.filter(date__gte=date)
+        if description:
+            queryset = queryset.filter(description=description)
+        
+        return queryset
+    
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        actualData = [transaction.amount for transaction in queryset]
+        actualDate = [transaction.date for transaction in queryset]
+        if not queryset.exists():
+            actualData =[0]
+            actualDate = [0]
+        return Response({'act': actualData , 'det':actualDate})
+        # Extract 'amount' from each transaction and create a list
+        
+
+        # Return as JSON response
+    # return queryset
+
 
 
 

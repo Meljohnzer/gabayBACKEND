@@ -17,4 +17,5 @@ urlpatterns = [
     path('generate-pdf/<int:user>/', GeneratePDFView.as_view(), name='generate-pdf'),
     path('add/fixed/savings/',AddFixedSavingsViews.as_view()),
     path('update/fixed/savings/<int:user>/',UpdateFixedSavingsViews.as_view()),
+    path('get/actual/data/',GetActualDataViews.as_view()),
     ]
